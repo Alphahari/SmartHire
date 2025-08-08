@@ -1,8 +1,8 @@
-# QuizMaster - Comprehensive Quiz Management System
+# ProctorX - Comprehensive Quiz Management System
 
 **Status: 🚧 In Progress**
 
-**QuizMaster** is a full-stack quiz application that provides a seamless experience for both students and administrators. Built with **Flask** and **Next.js (App Router)**, this system enables quiz creation, management, and performance analytics.
+**ProctorX** is a full-stack quiz application that provides a seamless experience for both students and administrators. Built with **Flask** and **Next.js (App Router)**, this system enables quiz creation, management, and performance analytics.
 
 ---
 
@@ -58,8 +58,8 @@
 
 1. Clone the repository and navigate to backend:
    ```bash
-   git clone https://github.com/yourusername/quizmaster.git
-   cd quizmaster/backend
+   git clone https://github.com/yourusername/ProctorX.git
+   cd ProctorX/backend
    ```
 
 2. Create and activate a virtual environment:
@@ -159,7 +159,7 @@ flask run
 ## 🗂 Project Structure
 
 ```
-quizmaster/
+ProctorX/
 ├── backend/                  # Flask backend
 │   ├── controllers/          # REST API endpoints
 │   ├── models/               # SQLAlchemy models
