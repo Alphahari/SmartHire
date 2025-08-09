@@ -1,8 +1,6 @@
-// app/page.tsx (App Router)
-"use client"; // required for using hooks like useRouter in the App Router
-
+// pages/index.tsx
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "next/router";
 import Link from "next/link";
 
 export default function LandingPage() {
