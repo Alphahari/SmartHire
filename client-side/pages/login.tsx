@@ -1,4 +1,6 @@
-// pages/login.tsx
+"use client";
+
+
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/router";
 
@@ -12,7 +14,6 @@ export default function Login() {
   const [form, setForm] = useState<LoginForm>({ email: "", password: "" });
   const [errorMessage, setErrorMessage] = useState<string>("");
 
-  // Simulated authentication store (replace with your real auth logic)
   const authStore = {
     isAuthenticated: false,
     canAccessAdmin: false,
@@ -29,10 +30,10 @@ export default function Login() {
       }
     },
     fetchUser: async () => {
-      // Fetch user details from API
+      
     }
   };
-
+  
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     try {

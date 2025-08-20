@@ -1,5 +1,4 @@
-// app/page.tsx (App Router)
-"use client"; // required for using hooks like useRouter in the App Router
+"use client";
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -7,59 +6,45 @@ import Link from "next/link";
 
 export default function LandingPage() {
   const router = useRouter();
+  // const authStore = {
+  //   isAuthenticated: false,
+  //   canAccessAdmin: false
+  // };
 
-  // Simulated auth store (replace with your real logic)
-  const authStore = {
-    isAuthenticated: false,
-    canAccessAdmin: false
-  };
-
-  useEffect(() => {
-    if (authStore.isAuthenticated) {
-      if (authStore.canAccessAdmin) {
-        router.push("/admin/dashboard");
-      } else {
-        router.push("/dashboard");
-      }
-    }
-  }, []);
+  // useEffect(() => {
+  //   if (authStore.isAuthenticated) {
+  //     if (authStore.canAccessAdmin) {
+  //       router.push("/admin/dashboard");
+  //     } else {
+  //       router.push("/dashboard");
+  //     }
+  //   }
+  // }, []);
 
   return (
-    <div className="landing-page">
-      <h1>Welcome to Our App</h1>
-      <div className="button-group">
-        <Link href="/login" className="btn">Login</Link>
-        <Link href="/register" className="btn">Register</Link>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center px-6">
+      <div className="text-center max-w-md w-full space-y-8">
+        <h1 className="text-4xl font-extrabold text-gray-800">
+          Welcome to Our App
+        </h1>
+        <p className="text-gray-600 text-lg">
+          Your journey starts here. Join us today.
+        </p>
+        <div className="flex justify-center space-x-4">
+          <Link
+            href="/login"
+            className="px-6 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition duration-200 shadow"
+          >
+            Login
+          </Link>
+          <Link
+            href="/register"
+            className="px-6 py-3 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50 transition duration-200"
+          >
+            Register
+          </Link>
+        </div>
       </div>
-
-      <style jsx>{`
-        .landing-page {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          height: 100vh;
-          text-align: center;
-          background: #f8f9fa;
-          font-family: sans-serif;
-        }
-        .button-group {
-          margin-top: 20px;
-          display: flex;
-          gap: 20px;
-        }
-        .btn {
-          padding: 10px 20px;
-          background-color: #007bff;
-          color: white;
-          text-decoration: none;
-          border-radius: 5px;
-          transition: background-color 0.3s ease;
-        }
-        .btn:hover {
-          background-color: #0056b3;
-        }
-      `}</style>
     </div>
   );
 }
