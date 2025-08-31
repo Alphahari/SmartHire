@@ -18,22 +18,21 @@ load_dotenv()
 
 app = Flask(__name__)
 CORS(app, 
-     origins=["http://localhost:5173"], 
+     origins=["http://localhost:3000"], 
      supports_credentials=True,
-     expose_headers=["Content-Type"],
      allow_headers=["Content-Type", "Authorization"],
+     expose_headers=["X-CSRF-TOKEN"],
      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"])
 
 app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
 app.config["JWT_COOKIE_SECURE"] = False  # True in production
-# app.config["JWT_COOKIE_HTTPONLY"] = True
+app.config["JWT_COOKIE_HTTPONLY"] = True
 app.config["JWT_COOKIE_CSRF_PROTECT"] = False
 app.config["JWT_COOKIE_SAMESITE"] = "Lax"
-app.config["JWT_ACCESS_COOKIE_PATH"] = "/api/"
-app.config["JWT_REFRESH_COOKIE_PATH"] = "/api/auth/refresh"
+app.config["JWT_ACCESS_COOKIE_PATH"] = "/"
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=30)
-app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=1)  
+app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(days=1)     
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'fallback-secret-key-for-dev')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -44,7 +43,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_recycle': 1800,
 }
 
-REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6380/0')
+REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6380')
 
 app.config.update(
     broker_url=REDIS_URL,

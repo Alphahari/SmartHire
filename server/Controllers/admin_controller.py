@@ -1,6 +1,5 @@
 from flask import current_app, jsonify, request
 from flask_restful import Resource
-from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 from models import QuizAttempt, db, User, Subject, Chapter, Quiz, Question, Score
 from functools import wraps
 from datetime import datetime, timedelta
@@ -68,9 +67,8 @@ def format_response(quiz):
 def admin_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        verify_jwt_in_request()
-        user_id = get_jwt_identity()
-        user = User.query.get(int(user_id))
+        # user_id =                  logic is to be updated
+        user = User.query.get()
         if not user or user.role.value != 'admin':
             return jsonify({'error': 'Admin access required'}), 403
         return fn(*args, **kwargs)
@@ -78,7 +76,6 @@ def admin_required(fn):
 
 def register_admin_routes(api):
     class AdminUsers(Resource):
-        @jwt_required()
         @admin_required
         def get(self):
             users = User.query.all()
@@ -93,7 +90,6 @@ def register_admin_routes(api):
             } for u in users])
     
     class AdminUser(Resource):
-        @jwt_required()
         @admin_required
         def delete(self, id):
             user = User.query.get(id)
@@ -107,7 +103,6 @@ def register_admin_routes(api):
             return {'message': 'User deleted successfully'}
         
     class AdminSubjects(Resource):
-        @jwt_required()
         @admin_required
         def post(self):
             data = request.get_json()
@@ -126,7 +121,6 @@ def register_admin_routes(api):
             }, 201
 
     class AdminSubject(Resource):
-        @jwt_required()
         @admin_required
         def put(self, id):
             data = request.get_json()
@@ -143,7 +137,6 @@ def register_admin_routes(api):
             cache.delete("user_subjects")
             return {'message': 'Subject updated'}
 
-        @jwt_required()
         @admin_required
         def delete(self, id):
             subject = Subject.query.get(id)
@@ -155,7 +148,6 @@ def register_admin_routes(api):
             return {'message': 'Subject deleted'}
 
     class AdminChapters(Resource):
-        @jwt_required()
         @admin_required
         def post(self):
             data = request.get_json()
@@ -179,7 +171,6 @@ def register_admin_routes(api):
             }, 201
 
     class AdminChapter(Resource):
-        @jwt_required()
         @admin_required
         def put(self, id):
             data = request.get_json()
@@ -196,7 +187,6 @@ def register_admin_routes(api):
             cache.delete(f"subject_{chapter.subject_id}")
             return {'message': 'Chapter updated'}
 
-        @jwt_required()
         @admin_required
         def delete(self, id):
             chapter = Chapter.query.get(id)
@@ -208,7 +198,6 @@ def register_admin_routes(api):
             return {'message': 'Chapter deleted'}
 
     class AdminQuizzes(Resource):
-        @jwt_required()
         @admin_required
         def post(self):
             data = request.get_json()
@@ -245,7 +234,6 @@ def register_admin_routes(api):
             return format_response(new_quiz), 201
 
     class AdminQuiz(Resource):
-        @jwt_required()
         @admin_required
         def put(self, id):
             quiz = Quiz.query.get(id)
@@ -289,7 +277,6 @@ def register_admin_routes(api):
             cache.delete(f"chapter_{chapter_id}")
             return jsonify(format_response(quiz))
 
-        @jwt_required()
         @admin_required
         def delete(self, id):
             quiz = Quiz.query.get(id)
@@ -301,7 +288,6 @@ def register_admin_routes(api):
             return {'message': 'Quiz deleted successfully'}, 200
 
     class AdminQuestions(Resource):
-        @jwt_required()
         @admin_required
         def post(self, quiz_id):
             quiz = Quiz.query.get(quiz_id)
@@ -334,7 +320,6 @@ def register_admin_routes(api):
             }, 201
 
     class AdminQuestion(Resource):
-        @jwt_required()
         @admin_required
         def get(self, id):
             question = Question.query.get(id)
@@ -353,7 +338,6 @@ def register_admin_routes(api):
                 'correct_option': question.correct_option
             }
 
-        @jwt_required()
         @admin_required
         def put(self, id):
             question = Question.query.get(id)
@@ -381,7 +365,6 @@ def register_admin_routes(api):
                 'correct_option': question.correct_option
             }
 
-        @jwt_required()
         @admin_required
         def delete(self, id):
             question = Question.query.get(id)
@@ -392,7 +375,6 @@ def register_admin_routes(api):
             return {'message': 'Question deleted successfully'}, 200
 
     class AdminSearch(Resource):
-        @jwt_required()
         @admin_required
         def get(self):
             search_term = request.args.get('q', '').strip()
@@ -482,7 +464,6 @@ def register_admin_routes(api):
                 'questions': formatted_questions
             })
     class AdminQuestionsInQuiz(Resource):
-        @jwt_required()
         def get(self, quiz_id):
             quiz = Quiz.query.options(
                 joinedload(Quiz.chapter).joinedload(Chapter.subject)
@@ -529,7 +510,6 @@ def register_admin_routes(api):
 
 
     class AdminSummaryStats(Resource):
-        @jwt_required()
         @admin_required
         def get(self):
             # Get query parameters
@@ -585,7 +565,6 @@ def register_admin_routes(api):
             }, 200
 
     class AdminUserGrowth(Resource):
-        @jwt_required()
         @admin_required
         def get(self):
             days = request.args.get('days', '30')
@@ -617,7 +596,6 @@ def register_admin_routes(api):
             }, 200
 
     class AdminSubjectPerformance(Resource):
-        @jwt_required()
         @admin_required
         def get(self):
             # Get average score per subject
@@ -662,7 +640,6 @@ def register_admin_routes(api):
             }, 200
 
     class AdminQuizActivity(Resource):
-        @jwt_required()
         @admin_required
         def get(self):
             days = request.args.get('days', '30')
@@ -694,7 +671,6 @@ def register_admin_routes(api):
             }, 200
 
     class AdminPerformanceDistribution(Resource):
-        @jwt_required()
         @admin_required
         def get(self):
             # Get all completed quiz attempts

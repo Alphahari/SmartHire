@@ -1,27 +1,29 @@
 from flask import jsonify, request
-from flask_jwt_extended import jwt_required
 from flask_restful import Resource
 from models import Subject, Chapter, Quiz
 from sqlalchemy.orm import joinedload
 from extensions import cache
-import time
 
-def register_user_routes(api):
+def register_user_routes(api): 
     class Subjects(Resource):
-        @cache.cached(timeout=30, key_prefix="user_subjects")
-        @jwt_required()
+        def options(self):
+            return {'Allow': 'GET'}, 200, \
+                {'Access-Control-Allow-Origin': 'http://localhost:3000/',
+                'Access-Control-Allow-Methods': 'GET',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Allow-Credentials': 'true'}
+        # @cache.cached(timeout=30, key_prefix="user_subjects")
         def get(self):
             subjects = Subject.query.all()
             # time.sleep(1)
             return jsonify([{
-                'id': s.id,
+                 'id': s.id,
                 'name': s.name,
                 'description': s.description
             } for s in subjects])
 
     class ChapterInSubject(Resource):
         @cache.cached(timeout=300, key_prefix=lambda: f"subject_{request.view_args['subject_id']}")
-        @jwt_required()
         def get(self, subject_id):
             subject = Subject.query.get_or_404(subject_id)
             return jsonify({
@@ -37,7 +39,6 @@ def register_user_routes(api):
 
     class QuizesInChapter(Resource):
         @cache.cached(timeout=300, key_prefix=lambda: f"chapter_{request.view_args['chapter_id']}")
-        @jwt_required()
         def get(self, chapter_id):
             chapter = Chapter.query.get_or_404(chapter_id)
             quizzes = []
@@ -63,7 +64,6 @@ def register_user_routes(api):
             })
 
     class QuestionsInQuizz(Resource):
-        @jwt_required()
         def get(self, quiz_id):
             quiz = Quiz.query.options(
                 joinedload(Quiz.chapter).joinedload(Chapter.subject)
@@ -101,7 +101,6 @@ def register_user_routes(api):
 
  
     class SearchQuizzes(Resource):
-        @jwt_required()
         def get(self):
             search_term = request.args.get('q', '').strip()
             if not search_term:

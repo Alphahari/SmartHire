@@ -2,6 +2,7 @@
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { Id, toast, ToastContainer } from 'react-toastify';
+import { signIn } from 'next-auth/react';
 
 type LoginFormData = {
     email: string;
@@ -20,14 +21,21 @@ export default function LoginForm() {
     const onSubmit = async (data: LoginFormData) => {
         const toastId: Id = toast.loading('Logging in...');
         try {
-            const res = await fetch(`${process.env.BASE_URL}/api/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
+            const result = await signIn('credentials', {
+                redirect: false,
+                email: data.email,
+                password: data.password,
             });
 
-            const result = await res.json();
-            if (res.ok) {
+            if (result?.error) {
+                toast.update(toastId, {
+                    render: 'Invalid credentials',
+                    type: 'error',
+                    isLoading: false,
+                    autoClose: 3000,
+                    closeOnClick: true,
+                });
+            } else {
                 toast.update(toastId, {
                     render: 'Login Successful!',
                     type: 'success',
@@ -36,41 +44,20 @@ export default function LoginForm() {
                     closeOnClick: true,
                 });
                 router.push('/dashboard');
-            } else {
-                toast.update(toastId, {
-                    render: 'Login Failed',
-                    type: 'warning',
-                    isLoading: false,
-                    autoClose: 3000,
-                    closeOnClick: true,
-                });
             }
         } catch (error) {
-                toast.update(toastId, {
-                    render: 'Error connecting to server',
-                    type: 'error',
-                    isLoading: false,
-                    autoClose: 3000,
-                    closeOnClick: true,
-                });
-        } finally {
-            toast.loading("");
+            toast.update(toastId, {
+                render: 'Error connecting to server',
+                type: 'error',
+                isLoading: false,
+                autoClose: 3000,
+                closeOnClick: true,
+            });
         }
     };
+    
     return (
         <>
-            <ToastContainer
-                position="top-right"
-                autoClose={5000}
-                hideProgressBar={false}
-                newestOnTop={false}
-                closeOnClick={false}
-                rtl={false}
-                pauseOnFocusLoss
-                draggable
-                pauseOnHover
-                theme="light"
-            />
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                 <div>
                     <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -80,6 +67,7 @@ export default function LoginForm() {
                         {...register('email', { required: 'Email is required' })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                     />
+                    {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
                 </div>
 
                 <div>
@@ -90,6 +78,7 @@ export default function LoginForm() {
                         {...register('password', { required: 'Password is required' })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                     />
+                    {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
                 </div>
 
                 <button

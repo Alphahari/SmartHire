@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
-import './globals.css'; 
+import './globals.css';
+import ToastContainerWrapper from "@/components/ToastContainerWrapper";
+import { SessionProviderWrapper } from "@/components/SessionProviderWrapper";
 
 export const metadata: Metadata = {
   title: "SmartHire",
@@ -13,9 +15,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-      >
-        {children}
+      <body>
+        <SessionProviderWrapper>
+          <ToastContainerWrapper/>
+          {children}
+        </SessionProviderWrapper>
       </body>
     </html>
   );
