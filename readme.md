@@ -1,4 +1,4 @@
-# SmartHire - AI Powered Job Interview Preparation Web Application**
+# SmartHire - AI Powered Job Interview Preparation Web Application   
 **Status: 🚧 In Progress**
 ## 📄 License
 
