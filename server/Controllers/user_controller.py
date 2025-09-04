@@ -5,13 +5,7 @@ from sqlalchemy.orm import joinedload
 from extensions import cache
 
 def register_user_routes(api): 
-    class Subjects(Resource):
-        def options(self):
-            return {'Allow': 'GET'}, 200, \
-                {'Access-Control-Allow-Origin': 'http://localhost:3000/',
-                'Access-Control-Allow-Methods': 'GET',
-                'Access-Control-Allow-Headers': 'Content-Type',
-                'Access-Control-Allow-Credentials': 'true'}
+    class Subjects(Resource):   
         # @cache.cached(timeout=30, key_prefix="user_subjects")
         def get(self):
             subjects = Subject.query.all()
@@ -23,7 +17,7 @@ def register_user_routes(api):
             } for s in subjects])
 
     class ChapterInSubject(Resource):
-        @cache.cached(timeout=300, key_prefix=lambda: f"subject_{request.view_args['subject_id']}")
+        # @cache.cached(timeout=300, key_prefix=lambda: f"subject_{request.view_args['subject_id']}")
         def get(self, subject_id):
             subject = Subject.query.get_or_404(subject_id)
             return jsonify({
@@ -38,7 +32,7 @@ def register_user_routes(api):
             })
 
     class QuizesInChapter(Resource):
-        @cache.cached(timeout=300, key_prefix=lambda: f"chapter_{request.view_args['chapter_id']}")
+        # @cache.cached(timeout=300, key_prefix=lambda: f"chapter_{request.view_args['chapter_id']}")
         def get(self, chapter_id):
             chapter = Chapter.query.get_or_404(chapter_id)
             quizzes = []

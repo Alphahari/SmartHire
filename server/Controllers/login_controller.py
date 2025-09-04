@@ -23,7 +23,6 @@ def register_login_routes(api):
             if not user or not bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
                 return {'error': 'Invalid credentials'}, 401
             access_token = create_access_token(identity=str(user.id))
-            print(access_token)
             response = jsonify({
                 'message': 'Login successful',
                 'user': {
