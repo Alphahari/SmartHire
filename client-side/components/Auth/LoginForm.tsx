@@ -1,7 +1,7 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { Id, toast, ToastContainer } from 'react-toastify';
+import { Id, toast } from 'react-toastify';
 import { signIn } from 'next-auth/react';
 
 type LoginFormData = {
@@ -43,7 +43,6 @@ export default function LoginForm() {
                     autoClose: 3000,
                     closeOnClick: true,
                 });
-                router.push('/dashboard');
             }
         } catch (error) {
             toast.update(toastId, {

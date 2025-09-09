@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import './globals.css';
 import ToastContainerWrapper from "@/components/ToastContainerWrapper";
-import { SessionProviderWrapper } from "@/components/SessionProviderWrapper";
+import { SessionProviderWrapper } from "@/components/Auth/SessionProviderWrapper";
 
 export const metadata: Metadata = {
   title: "SmartHire",

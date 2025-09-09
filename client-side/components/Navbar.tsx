@@ -1,9 +1,9 @@
-import React from 'react'
-
+import Logout from './Auth/Logout';
 const Navbar = () => {
   return (
-    <div>
+    <div className='flex justify-evenly items-center'>
       NavBar
+      <Logout/>
     </div>
   )
 }

@@ -3,8 +3,8 @@
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import LoginForm from '@/components/LoginForm';
-import LoginButtons from '@/components/LoginButtons';
+import LoginForm from '@/components/Auth/LoginForm';
+import LoginButtons from '@/components/Buttons/LoginButtons';
 import Link from 'next/link';
 
 const Page = () => {
@@ -13,7 +13,11 @@ const Page = () => {
 
   useEffect(() => {
     if (status === 'authenticated') {
-      router.push('/dashboard');
+      if(session.user.role === 'admin'){
+        router.push('/admin//dashboard');
+      }else{
+        router.push('/dashboard');
+      }
     }
   }, [status, router]);
 
