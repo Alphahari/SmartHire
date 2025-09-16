@@ -8,12 +8,6 @@ from datetime import datetime
 def register_login_routes(api):
         
     class Login(Resource):
-        def options(self): 
-            return {'Allow': 'POST'}, 200, \
-                {'Access-Control-Allow-Origin': 'http://localhost:3000',
-                'Access-Control-Allow-Methods': 'POST',
-                'Access-Control-Allow-Headers': 'Content-Type',
-                'Access-Control-Allow-Credentials': 'true'}
         def post(self):
             data = request.get_json()
             email = data.get('email').strip()
@@ -44,29 +38,61 @@ def register_login_routes(api):
             email = data.get('email')
             password = data.get('password')
             full_name = data.get('full_name')
-            username = data.get('username')
-            dob = data.get('dob')
-            if dob:
-                dob = datetime.strptime(dob, '%Y-%m-%d').date()
-            qualification = data.get('qualification')
-
             if User.query.filter_by(email=email).first():
                 return {'error': 'Email already registered'}, 400
-
             hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
             new_user = User(
-                username=username,
                 email=email,
                 password=hashed_password,
                 full_name=full_name,
-                dob=dob,
-                qualification=qualification
             )
             db.session.add(new_user)
             db.session.commit()
 
             return {'message': 'Registration successful'}, 201
+    class OAuthLogin(Resource):
+        def post(self):
+            data = request.json
+            email = data.get('email')
+            name = data.get('name')
+            provider = data.get('provider')
+            provider_id = data.get('providerAccountId')
+
+            if not email:
+                return {"error": "Email is required"}, 400
+
+            user = User.query.filter_by(email=email).first()
+
+            if not user:
+                user = User(
+                    email=email,
+                    full_name=name or email.split('@')[0],
+                    password="oauth_login",
+                    provider=provider,
+                    provider_id=provider_id
+                )
+                db.session.add(user)
+                db.session.commit()
+            else:
+                if not user.provider:
+                    user.provider = provider
+                    user.provider_id = provider_id
+                    db.session.commit()
+
+            access_token = create_access_token(identity=str(user.id))
+
+            return {
+                'message': 'Login successful',
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "name": user.full_name,
+                    "role": user.role.value,
+                    "access_token": access_token
+                }
+            }, 200
 
     api.add_resource(Login, '/auth/login')
     api.add_resource(Register, '/auth/register')
+    api.add_resource(OAuthLogin, '/auth/oauth-login')

@@ -1,5 +1,6 @@
 // components/SubjectGrid.tsx
 import { Subject } from '@/types/Subject';
+import { useRouter } from 'next/navigation';
 
 interface SubjectGridProps {
   subjects: Subject[];
@@ -8,6 +9,12 @@ interface SubjectGridProps {
 }
 
 const SubjectGrid = ({ subjects, loading, error }: SubjectGridProps) => {
+  const router = useRouter();
+
+  const handleExploreClick = (subjectId: number) => {
+    router.push(`/subjects/${subjectId}`);
+  };
+
   if (loading) {
     return (
       <div className="animate-pulse">
@@ -48,7 +55,10 @@ const SubjectGrid = ({ subjects, loading, error }: SubjectGridProps) => {
                   : 'No description available.'}
               </p>
             </div>
-            <button className="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition-colors">
+            <button 
+              onClick={() => handleExploreClick(subject.id)}
+              className="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-lg transition-colors"
+            >
               Explore
             </button>
           </div>

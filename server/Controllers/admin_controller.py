@@ -1,4 +1,4 @@
-from flask import current_app, jsonify, request
+from flask import jsonify, request
 from flask_restful import Resource
 from models import QuizAttempt, db, User, Subject, Chapter, Quiz, Question, Score
 from functools import wraps
@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import pytz
 from sqlalchemy.orm import joinedload
 from sqlalchemy import func, or_
-from extensions import cache
+# from extensions import cache
 
 # Helper functions
 def convert_to_ist1(dt):
@@ -76,7 +76,7 @@ def admin_required(fn):
 
 def register_admin_routes(api):
     class AdminUsers(Resource):
-        @admin_required
+        # @admin_required
         def get(self):
             users = User.query.all()
             return jsonify([{
@@ -90,7 +90,7 @@ def register_admin_routes(api):
             } for u in users])
     
     class AdminUser(Resource):
-        @admin_required
+        # @admin_required
         def delete(self, id):
             user = User.query.get(id)
             if not user:
@@ -103,7 +103,7 @@ def register_admin_routes(api):
             return {'message': 'User deleted successfully'}
         
     class AdminSubjects(Resource):
-        @admin_required
+        # @admin_required
         def post(self):
             data = request.get_json()
             name = data.get('name')
@@ -113,7 +113,7 @@ def register_admin_routes(api):
             db.session.add(new_subject)
             db.session.commit()
             # cache.delete_memoized("user_subjects")
-            cache.delete("user_subjects")
+            # cache.delete("user_subjects")
             return {
                 'id': new_subject.id,
                 'name': new_subject.name,
@@ -121,7 +121,7 @@ def register_admin_routes(api):
             }, 201
 
     class AdminSubject(Resource):
-        @admin_required
+        # @admin_required
         def put(self, id):
             data = request.get_json()
             name = data.get('name')
@@ -134,21 +134,21 @@ def register_admin_routes(api):
             subject.name = name
             subject.description = description
             db.session.commit()
-            cache.delete("user_subjects")
+            # cache.delete("user_subjects")
             return {'message': 'Subject updated'}
 
-        @admin_required
+        # @admin_required
         def delete(self, id):
             subject = Subject.query.get(id)
             if not subject:
                 return {'message': 'Subject not found'}, 404
             db.session.delete(subject)
             db.session.commit()
-            cache.delete("user_subjects")
+            # cache.delete("user_subjects")
             return {'message': 'Subject deleted'}
 
     class AdminChapters(Resource):
-        @admin_required
+        # @admin_required
         def post(self):
             data = request.get_json()
             name = data.get('name')
@@ -162,7 +162,7 @@ def register_admin_routes(api):
             )
             db.session.add(new_chapter)
             db.session.commit()
-            cache.delete(f"subject_{subject_id}")
+            # cache.delete(f"subject_{subject_id}")
             return {
                 'id': new_chapter.id,
                 'name': new_chapter.name,
@@ -171,7 +171,7 @@ def register_admin_routes(api):
             }, 201
 
     class AdminChapter(Resource):
-        @admin_required
+        # @admin_required
         def put(self, id):
             data = request.get_json()
             name = data.get('name')
@@ -184,21 +184,21 @@ def register_admin_routes(api):
             chapter.name = name
             chapter.description = description
             db.session.commit()
-            cache.delete(f"subject_{chapter.subject_id}")
+            # cache.delete(f"subject_{chapter.subject_id}")
             return {'message': 'Chapter updated'}
 
-        @admin_required
+        # @admin_required
         def delete(self, id):
             chapter = Chapter.query.get(id)
             if not chapter:
                 return {'message': 'Chapter not found'}, 404
             db.session.delete(chapter)
             db.session.commit()
-            cache.delete(f"subject_{chapter.subject_id}")
+            # cache.delete(f"subject_{chapter.subject_id}")
             return {'message': 'Chapter deleted'}
 
     class AdminQuizzes(Resource):
-        @admin_required
+        # @admin_required
         def post(self):
             data = request.get_json()
             chapter_id = data.get('chapter_id')
@@ -230,11 +230,11 @@ def register_admin_routes(api):
             )
             db.session.add(new_quiz)
             db.session.commit()
-            cache.delete(f"chapter_{chapter_id}")
+            # cache.delete(f"chapter_{chapter_id}")
             return format_response(new_quiz), 201
 
     class AdminQuiz(Resource):
-        @admin_required
+        # @admin_required
         def put(self, id):
             quiz = Quiz.query.get(id)
             if not quiz:
@@ -274,21 +274,21 @@ def register_admin_routes(api):
                 quiz.remarks = remarks
 
             db.session.commit()
-            cache.delete(f"chapter_{chapter_id}")
+            # cache.delete(f"chapter_{chapter_id}")
             return jsonify(format_response(quiz))
 
-        @admin_required
+        # @admin_required
         def delete(self, id):
             quiz = Quiz.query.get(id)
             if not quiz:
                 return {'error': 'Quiz not found'}, 404
             db.session.delete(quiz)
             db.session.commit()
-            cache.delete(f"chapter_{quiz.chapter_id}")
+            # cache.delete(f"chapter_{quiz.chapter_id}")
             return {'message': 'Quiz deleted successfully'}, 200
 
     class AdminQuestions(Resource):
-        @admin_required
+        # @admin_required
         def post(self, quiz_id):
             quiz = Quiz.query.get(quiz_id)
             if not quiz:
@@ -320,7 +320,7 @@ def register_admin_routes(api):
             }, 201
 
     class AdminQuestion(Resource):
-        @admin_required
+        # @admin_required
         def get(self, id):
             question = Question.query.get(id)
             if not question:
@@ -338,7 +338,7 @@ def register_admin_routes(api):
                 'correct_option': question.correct_option
             }
 
-        @admin_required
+        # @admin_required
         def put(self, id):
             question = Question.query.get(id)
             if not question:
@@ -365,7 +365,7 @@ def register_admin_routes(api):
                 'correct_option': question.correct_option
             }
 
-        @admin_required
+        # @admin_required
         def delete(self, id):
             question = Question.query.get(id)
             if not question:
@@ -375,7 +375,7 @@ def register_admin_routes(api):
             return {'message': 'Question deleted successfully'}, 200
 
     class AdminSearch(Resource):
-        @admin_required
+        # @admin_required
         def get(self):
             search_term = request.args.get('q', '').strip()
             if not search_term:
@@ -510,7 +510,7 @@ def register_admin_routes(api):
 
 
     class AdminSummaryStats(Resource):
-        @admin_required
+        # @admin_required
         def get(self):
             # Get query parameters
             days = request.args.get('days', '30')
@@ -565,7 +565,7 @@ def register_admin_routes(api):
             }, 200
 
     class AdminUserGrowth(Resource):
-        @admin_required
+        # @admin_required
         def get(self):
             days = request.args.get('days', '30')
             
@@ -596,7 +596,7 @@ def register_admin_routes(api):
             }, 200
 
     class AdminSubjectPerformance(Resource):
-        @admin_required
+        # @admin_required
         def get(self):
             # Get average score per subject
             subjects = Subject.query.all()
@@ -640,7 +640,7 @@ def register_admin_routes(api):
             }, 200
 
     class AdminQuizActivity(Resource):
-        @admin_required
+        # @admin_required
         def get(self):
             days = request.args.get('days', '30')
             
@@ -671,7 +671,7 @@ def register_admin_routes(api):
             }, 200
 
     class AdminPerformanceDistribution(Resource):
-        @admin_required
+        # @admin_required
         def get(self):
             # Get all completed quiz attempts
             attempts = QuizAttempt.query.filter(QuizAttempt.end_time.isnot(None)).all()

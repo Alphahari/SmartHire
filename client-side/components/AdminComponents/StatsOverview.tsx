@@ -1,4 +1,3 @@
-// components/StatsOverview.tsx
 import { Subject } from '@/types/Subject';
 
 interface StatsOverviewProps {
@@ -70,7 +69,7 @@ const StatsOverview = ({ subjects }: StatsOverviewProps) => {
             </button>
             <button className="w-full flex items-center justify-between p-3 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
               <span>View Reports</span>
-              <span>📈</span>
+              <span>📈</span> 
             </button>
           </div>
         </div>

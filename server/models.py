@@ -12,16 +12,15 @@ class Role(Enum):
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    username = db.Column(db.String(50), unique=True, nullable=False)
-    email = db.Column(db.String(100), unique=True, nullable=False)
-    password = db.Column(db.String(200), nullable=False)
-    full_name = db.Column(db.String(100), nullable=False)
-    dob = db.Column(db.Date)
-    qualification = db.Column(db.String(100))
-    last_visited = db.Column(db.DateTime, default=datetime.utcnow)
-    reminder_time = db.Column(db.Time, nullable=True)
-    role = db.Column(db.Enum(Role), default=Role.USER, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    full_name = db.Column(db.String(100), nullable=False)
+    last_visited = db.Column(db.DateTime, default=datetime.utcnow)
+    password = db.Column(db.String(200), nullable=False)
+    provider = db.Column(db.String(100))
+    provider_id = db.Column(db.String(100))
+    role = db.Column(db.Enum(Role), default=Role.USER, nullable=False)
+    reminder_time = db.Column(db.Time, nullable=True)
     scores = db.relationship('Score', backref='user', cascade='all, delete-orphan', passive_deletes=True)
 
 class Subject(db.Model):

@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { fetchSubjects } from '@/actions/fetchSubjects';
+import { fetchSubjects } from '@/actions/SubjectsAPI';
 import { Subject } from '@/types/Subject';
 import AdminProtectedRoute from '@/components/AdminComponents/AdminProtectedRoute';
 import AdminSidebar from '@/components/AdminComponents/AdminSidebar';
-import StatsOverview from '@/components/AdminComponents/tatsOverview';
+import StatsOverview from '@/components/AdminComponents/StatsOverview';
 import SubjectManagement from '@/components/Subject/SubjectManagement';
 
 export default function AdminDashboard() {
@@ -16,33 +16,45 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const { data: session } = useSession();
 
-  useEffect(() => {
-    async function getSubjects() {
-      try {
-        const subs = await fetchSubjects();
-        if (!subs) {
-          setError('Failed to fetch subjects. Please try again later.');
-        } else {
-          setSubjects(subs);
-        }
-      } catch (err) {
-        setError('An unexpected error occurred.');
-      } finally {
-        setLoading(false);
+  // ✅ Extracted fetch function for reuse
+  const getSubjects = async () => {
+    try {
+      setLoading(true);
+      const subs = await fetchSubjects();
+      if (!subs) {
+        setError('Failed to fetch subjects. Please try again later.');
+      } else {
+        setSubjects(subs);
+        setError(null);
       }
+    } catch (err) {
+      setError('An unexpected error occurred.');
+    } finally {
+      setLoading(false);
     }
+  };
 
+  // ✅ Reuse getSubjects in useEffect
+  useEffect(() => {
     if (session) {
       getSubjects();
     }
   }, [session]);
 
+  // ✅ Updated to include onSubjectChange
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
         return <StatsOverview subjects={subjects} />;
       case 'subjects':
-        return <SubjectManagement subjects={subjects} loading={loading} error={error} />;
+        return (
+          <SubjectManagement 
+            subjects={subjects} 
+            loading={loading} 
+            error={error} 
+            onSubjectChange={getSubjects} // Pass refresh function
+          />
+        );
       case 'users':
         return <div>User Management - To be implemented</div>;
       case 'analytics':

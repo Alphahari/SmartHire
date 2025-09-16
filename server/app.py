@@ -24,7 +24,7 @@ CORS(app,
 app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
 app.config["JWT_ACCESS_COOKIE_PATH"] = "/"
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=30) 
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=60) 
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'fallback-secret-key-for-dev')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -68,10 +68,9 @@ def create_admin_user():
     if not admin:
         hashed_password = bcrypt.hashpw(b'adminpassword', bcrypt.gensalt()).decode('utf-8')
         admin_user = User(
-            username='admin',
             email='quizlytic.help@gmail.com',
             password=hashed_password,
-            full_name='Admin User',
+            full_name='Admin',
             role=Role.ADMIN
         )
         db.session.add(admin_user)

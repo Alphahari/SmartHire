@@ -2,7 +2,7 @@
 import UserProtectedRoute from '@/components/UserComponents/UserProtectedRoute';
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { fetchSubjects } from '@/actions/fetchSubjects';
+import { fetchSubjects } from '@/actions/SubjectsAPI';
 import { Subject } from '@/types/Subject';
 import SubjectGrid from '@/components/Subject/SubjectGrid';
 import UserStats from '@/components/UserComponents/UserStats';
@@ -17,7 +17,7 @@ export default function UserDashboard() {
 
   useEffect(() => {
     async function getSubjects() {
-      try {
+      try {     
         const subs = await fetchSubjects();
         if (!subs) {
           setError('Failed to fetch subjects. Please try again later.');
@@ -35,6 +35,7 @@ export default function UserDashboard() {
       getSubjects();
     }
   }, [session]);
+  console.log(session)
 
   const renderContent = () => {
     switch (activeTab) {
