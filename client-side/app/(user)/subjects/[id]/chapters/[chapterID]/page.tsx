@@ -56,11 +56,10 @@ export default function ChapterPage() {
           </div>
           
           <QuizList 
-            quizzes={quizzes} 
-            loading={loading} 
+            quizzes={quizzes}
+            loading={loading}
             error={error}
-            chapterId={chapterId}
-          />
+            chapterId={chapterId} userId={0}          />
         </div>
       </div>
     </UserProtectedRoute>

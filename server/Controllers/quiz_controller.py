@@ -1,42 +1,65 @@
-#Logic is pending
-
 from flask_restful import Resource
 from flask import request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 from datetime import datetime
-from models import db, Quiz, QuizAttempt, Score, Question
+from models import db, Quiz, QuizAttempt, Score, Question, QuizAttempt, Score, Quiz, Chapter 
 import pytz
 # from extensions import cache
+from sqlalchemy.orm import joinedload
 
 class GetAttemptByQuiz(Resource):
-    @jwt_required()
-    def get(self):
-        current_user_id = get_jwt_identity()
-        quiz_id = request.args.get('quiz_id')
+    def post(self):
+        data = request.get_json()
+        current_user_id = data.get('user_id')
+        quiz_id = data.get('quiz_id')
 
+        if not current_user_id:
+            return {'error': 'User ID is required'}, 401
         if not quiz_id:
             return {'error': 'Quiz ID is required'}, 400
 
+        # Find the most recent attempt for this user and quiz
         attempt = QuizAttempt.query.filter_by(
             user_id=int(current_user_id),
             quiz_id=quiz_id
-        ).first()
+        ).order_by(QuizAttempt.start_time.desc()).first()
 
         if not attempt:
-            return {'error': 'No attempt found'}, 404
+            # Return a successful response with no attempt found
+            return {
+                'has_attempt': False,
+                'message': 'No attempt found'
+            }, 200
 
-        return {'attempt_id': attempt.id}, 200
+        # Check if the attempt is completed (has end_time)
+        if attempt.end_time is not None:
+            return {
+                'has_attempt': True,
+                'attempt_id': attempt.id,
+                'completed': True,
+                'end_time': attempt.end_time.isoformat() + 'Z'
+            }, 200
+        else:
+            return {
+                'has_attempt': True,
+                'attempt_id': attempt.id,
+                'completed': False,
+                'start_time': attempt.start_time.isoformat() + 'Z'
+            }, 200
 
 class QuizResults(Resource):
-    # @cache.cached(timeout=3600, query_string=True)
-    @jwt_required()
-    def get(self, attempt_id):
-        current_user_id = get_jwt_identity()
+    def post(self, attempt_id):
+        data = request.get_json()
+        user_id = data.get('user_id')
         
+        if not user_id:
+            return {'error': 'User ID is required'}, 400
+
         # Fetch the quiz attempt
         attempt = QuizAttempt.query.get_or_404(attempt_id)
-        if attempt.user_id != int(current_user_id):
-            return {'error': 'Unauthorized'}, 401
+        
+        # Check if the user is authorized to view these results
+        if attempt.user_id != int(user_id):
+            return {'error': 'Unauthorized to view these results'}, 403
 
         # Fetch all scores for this attempt
         scores = Score.query.filter_by(attempt_id=attempt_id).all()
@@ -79,51 +102,75 @@ class QuizResults(Resource):
         }
     
 class StartQuiz(Resource):
-    @jwt_required()
     def post(self, quiz_id):
-        current_user_id = get_jwt_identity()
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return {'error': 'User ID is required'}, 400
+
         quiz = Quiz.query.get_or_404(quiz_id)
         
-        # Check for ANY existing attempt (completed or not)
+        # Check if current time is within quiz availability window
+        current_time = datetime.utcnow()
+        if current_time < quiz.start_time:
+            return {'error': 'Quiz has not started yet'}, 400
+            
+        if current_time > quiz.end_time:
+            return {'error': 'Quiz has ended'}, 400
+
+        # Check if user has already completed this quiz
         existing_attempt = QuizAttempt.query.filter_by(
-            user_id=int(current_user_id),
+            user_id=user_id,
             quiz_id=quiz_id
         ).first()
         
+        if existing_attempt and existing_attempt.end_time is not None:
+            return {'error': 'Quiz already attempted'}, 400
+        
+        # If there's an existing attempt but not completed, return it
         if existing_attempt:
-            return {'error': 'You have already attempted this quiz'}, 200
+            return {
+                'attempt_id': existing_attempt.id,
+                'start_time': existing_attempt.start_time.isoformat() + 'Z'
+            }, 200
 
         # Create new attempt
         attempt = QuizAttempt(
-            user_id=int(current_user_id),
+            user_id=user_id,
             quiz_id=quiz_id,
             start_time=datetime.utcnow()
         )
         db.session.add(attempt)
         db.session.commit()
         
-        # Fix datetime conversion
         return {
             'attempt_id': attempt.id,
-            'start_time': attempt.start_time.isoformat() + 'Z'  # UTC format
+            'start_time': attempt.start_time.isoformat() + 'Z'
         }, 201
 
 class SubmitQuiz(Resource):
-    @jwt_required()
     def post(self, quiz_id):
-        verify_jwt_in_request()
-        current_user_id = get_jwt_identity()
         data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return {'error': 'User ID is required'}, 400
 
-        # Check for existing attempt
+        # Check for existing attempt (both completed and in-progress)
         attempt = QuizAttempt.query.filter_by(
-            user_id=int(current_user_id),
-            quiz_id=quiz_id,
-            end_time=None
+            user_id=user_id,
+            quiz_id=quiz_id
         ).first()
-
+        
+        print(f"SubmitQuiz: Looking for attempt for user {user_id} on quiz {quiz_id}")
+        print(f"SubmitQuiz: Found attempt: {attempt}")
+        
         if not attempt:
-            return {'error': 'No active quiz attempt found'}, 400
+            return {'error': 'No quiz attempt found'}, 400
+            
+        if attempt.end_time is not None:
+            return {'error': 'Quiz already submitted'}, 400
 
         # Calculate time spent
         quiz = Quiz.query.get_or_404(quiz_id)
@@ -132,7 +179,7 @@ class SubmitQuiz(Resource):
         # Update attempt
         attempt.end_time = datetime.utcnow()
         attempt.time_spent = time_spent
-
+        
         # Get all questions for this quiz
         questions = Question.query.filter_by(quiz_id=quiz_id).all()
         
@@ -140,24 +187,26 @@ class SubmitQuiz(Resource):
         for question in questions:
             selected_option = data.get('answers', {}).get(str(question.id))
             score = Score(
-                user_id=int(current_user_id),
+                user_id=int(user_id),
                 quiz_id=quiz_id,
                 question_id=question.id,
-                selected_option=selected_option,  # Can be None
+                selected_option=selected_option,
                 attempt_id=attempt.id
             )
             db.session.add(score)
 
         db.session.commit()
-        return {'message': 'Quiz submitted successfully'}, 200      
+        print(f"SubmitQuiz: Successfully submitted quiz {quiz_id} for user {user_id}")
+        return {'message': 'Quiz submitted successfully'}, 200    
 
 class QuizAttemptStatus(Resource):
-    @jwt_required()
-    # @cache.cached(timeout=300, query_string=True)
-    def get(self):
+    def post(self):  # Change from get to post
+        data = request.get_json()
+        current_user_id = data.get('user_id')
+        chapter_id = data.get('chapter_id')  # Get from body instead of query params
         
-        current_user_id = get_jwt_identity()
-        chapter_id = request.args.get('chapter_id')
+        if not current_user_id:
+            return {'error': 'User ID is required'}, 401
         
         # Get all quiz attempts for this user in the chapter
         attempts = QuizAttempt.query.filter_by(
@@ -170,22 +219,20 @@ class QuizAttemptStatus(Resource):
         return [{
             'quiz_id': a.quiz_id,
             'attempted': True
-        } for a in attempts]    
+        } for a in attempts]     
 
-from flask_restful import Resource
-from flask_jwt_extended import jwt_required, get_jwt_identity
-from flask import jsonify
-from sqlalchemy.orm import joinedload
-from models import QuizAttempt, Score, Quiz, Chapter  # adjust imports as needed
 
+# In quiz_controller.py, update the UserQuizAttempts class
 class UserQuizAttempts(Resource):
-    # @cache.cached(timeout=600, key_prefix=lambda: f"user_attempts_{get_jwt_identity()}")
-    @jwt_required()
-    def get(self):
-        current_user_id = get_jwt_identity()
-
+    def post(self):
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return {'error': 'User ID is required'}, 401
+        
         # Fetch all quiz attempts by the user, along with related quiz, chapter, and subject info
-        attempts = QuizAttempt.query.filter_by(user_id=int(current_user_id)).options(
+        attempts = QuizAttempt.query.filter_by(user_id=int(user_id)).options(
             joinedload(QuizAttempt.quiz)
                 .joinedload(Quiz.chapter)
                 .joinedload(Chapter.subject),

@@ -10,7 +10,7 @@ const UserSidebar = ({ activeTab, setActiveTab }: UserSidebarProps) => {
   const menuItems = [
     { id: 'subjects', label: 'My Subjects', icon: '📚' },
     { id: 'stats', label: 'Statistics', icon: '📊' },
-    { id: 'progress', label: 'Progress', icon: '🎯' },
+    { id: 'past-quizzes', label: 'Past Quizzes', icon: '📝' }, // Changed from 'progress' to 'past-quizzes'
     { id: 'achievements', label: 'Achievements', icon: '🏆' },
   ];
 

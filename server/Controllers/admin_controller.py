@@ -64,29 +64,16 @@ def format_response(quiz):
         'remarks': quiz.remarks
     }
 
-def admin_required(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        # user_id =                  logic is to be updated
-        user = User.query.get()
-        if not user or user.role.value != 'admin':
-            return jsonify({'error': 'Admin access required'}), 403
-        return fn(*args, **kwargs)
-    return wrapper
 
 def register_admin_routes(api):
     class AdminUsers(Resource):
-        # @admin_required
         def get(self):
             users = User.query.all()
             return jsonify([{
                 'id': u.id,
-                'username': u.username,
-                'email': u.email,
+                'email': u.email,  
                 'role': u.role.value,
                 'full_name': u.full_name,
-                'date_of_birth': u.dob,
-                'qualification': u.qualification
             } for u in users])
     
     class AdminUser(Resource):

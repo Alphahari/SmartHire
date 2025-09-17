@@ -8,6 +8,7 @@ import AdminProtectedRoute from '@/components/AdminComponents/AdminProtectedRout
 import AdminSidebar from '@/components/AdminComponents/AdminSidebar';
 import StatsOverview from '@/components/AdminComponents/StatsOverview';
 import SubjectManagement from '@/components/Subject/SubjectManagement';
+import UserManagement from '@/components/AdminComponents/UserManagement';
 
 export default function AdminDashboard() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -41,7 +42,6 @@ export default function AdminDashboard() {
     }
   }, [session]);
 
-  // ✅ Updated to include onSubjectChange
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
@@ -52,11 +52,11 @@ export default function AdminDashboard() {
             subjects={subjects} 
             loading={loading} 
             error={error} 
-            onSubjectChange={getSubjects} // Pass refresh function
+            onSubjectChange={getSubjects}
           />
         );
       case 'users':
-        return <div>User Management - To be implemented</div>;
+        return <UserManagement onUserChange={getSubjects} />;
       case 'analytics':
         return <div>Analytics - To be implemented</div>;
       default:

@@ -7,6 +7,7 @@ import { Subject } from '@/types/Subject';
 import SubjectGrid from '@/components/Subject/SubjectGrid';
 import UserStats from '@/components/UserComponents/UserStats';
 import UserSidebar from '@/components/UserComponents/UserSidebar';
+import PastQuizzesContent from '@/components/UserComponents/PastQuizzesContent';
 
 export default function UserDashboard() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -43,6 +44,8 @@ export default function UserDashboard() {
         return <SubjectGrid subjects={subjects} loading={loading} error={error} />;
       case 'stats':
         return <UserStats />;
+      case 'past-quizzes': // Add this case
+        return <PastQuizzesContent />;
       case 'progress':
         return <div>Progress Tracking - To be implemented</div>;
       default:

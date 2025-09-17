@@ -10,7 +10,6 @@ const AdminSidebar = ({ activeTab, setActiveTab }: AdminSidebarProps) => {
 const menuItems = [
   { id: 'overview', label: 'Overview', icon: '📊' },
   { id: 'subjects', label: 'Subjects', icon: '📚' },
-  { id: 'questions', label: 'Questions', icon: '❓' },
   { id: 'users', label: 'Users', icon: '👥' },
   { id: 'analytics', label: 'Analytics', icon: '📈' },
 ];
