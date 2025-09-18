@@ -9,6 +9,7 @@ import AdminSidebar from '@/components/AdminComponents/AdminSidebar';
 import StatsOverview from '@/components/AdminComponents/StatsOverview';
 import SubjectManagement from '@/components/Subject/SubjectManagement';
 import UserManagement from '@/components/AdminComponents/UserManagement';
+import AdminAnalytics from '@/components/AdminComponents/AdminAnalytics';
 
 export default function AdminDashboard() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -58,7 +59,7 @@ export default function AdminDashboard() {
       case 'users':
         return <UserManagement onUserChange={getSubjects} />;
       case 'analytics':
-        return <div>Analytics - To be implemented</div>;
+        return <AdminAnalytics />; // Add this line
       default:
         return <StatsOverview subjects={subjects} />;
     }
