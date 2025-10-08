@@ -6,19 +6,15 @@ export default function RegisterationForm() {
     const router = useRouter();
 
     interface LoginFormData {
-        username: string;
+        full_name: string;
         email: string;
         password: string;
-        qualification?: string;
-        dob?: string;
     }
 
     const [formData, setFormData] = useState<LoginFormData>({
-        username: '',
+        full_name: '',
         email: '',
-        password: '',
-        qualification: '',
-        dob: '',
+        password: ''
     });
 
 
@@ -32,7 +28,7 @@ export default function RegisterationForm() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await fetch(`${process.env.BASE_URL}/api/auth/login`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/register`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -57,12 +53,12 @@ export default function RegisterationForm() {
             <form onSubmit={handleSubmit} className="space-y-4">
 
                 <div>
-                    <label htmlFor="username" className="block text-sm font-medium">Username</label>
+                    <label htmlFor="full_name" className="block text-sm font-medium">Full Name</label>
                     <input
                         type="text"
-                        name="username"
-                        id="username"
-                        value={formData.username}
+                        name="full_name"
+                        id="full_name"
+                        value={formData.full_name}
                         onChange={handleChange}
                         required
                         className="mt-1 block w-full px-3 py-2 border rounded-md"
@@ -95,35 +91,11 @@ export default function RegisterationForm() {
                     />
                 </div>
 
-                <div>
-                    <label htmlFor="qualification" className="block text-sm font-medium">Qualification</label>
-                    <input
-                        type="text"
-                        name="qualification"
-                        id="qualification"
-                        value={formData.qualification}
-                        onChange={handleChange}
-                        className="mt-1 block w-full px-3 py-2 border rounded-md"
-                    />
-                </div>
-
-                <div>
-                    <label htmlFor="dob" className="block text-sm font-medium">Date of Birth</label>
-                    <input
-                        type="date"
-                        name="dob"
-                        id="dob"
-                        value={formData.dob}
-                        onChange={handleChange}
-                        className="mt-1 block w-full px-3 py-2 border rounded-md"
-                    />
-                </div>
-
                 <button
                     type="submit"
                     className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
-                    Login
+                    Register Now
                 </button>
             </form>
 
