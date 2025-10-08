@@ -51,6 +51,7 @@ def register_login_routes(api):
             db.session.commit()
 
             return {'message': 'Registration successful'}, 201
+        
     class OAuthLogin(Resource):
         def post(self):
             data = request.json
