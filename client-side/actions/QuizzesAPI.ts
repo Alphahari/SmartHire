@@ -83,3 +83,38 @@ export async function deleteQuiz(id: string) {
     return false;
   }
 }
+
+export async function fetchQuizById(quizId: number) {
+  try {
+    const response = await fetch(`http://localhost:5000/api/quiz/${quizId}`, {
+      credentials: 'include',
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch quiz');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching quiz:', error);
+    return null;
+  }
+}
+
+export async function fetchQuizDuration(quizId: number) {
+  try {
+    const response = await fetch(`http://localhost:5000/api/quiz/${quizId}`, {
+      credentials: 'include',
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch quiz duration');
+    }
+    
+    const data = await response.json();
+    return data.duration || 60; // fallback to 60 minutes
+  } catch (error) {
+    console.error('Error fetching quiz duration:', error);
+    return 60; // fallback duration
+  }
+}

@@ -9,6 +9,7 @@ import { fetchQuestionsByQuiz } from '@/actions/QuestionsAPI';
 import { startQuiz } from '@/actions/QuizStart';
 import { submitQuiz } from '@/actions/QuizSubmit';
 import { fetchQuizAttempt } from '@/actions/QuizResults';
+import { fetchQuizDuration } from '@/actions/QuizzesAPI';
 
 import QuizInterface from '@/components/Quiz/QuizInterface';
 import UserProtectedRoute from '@/components/UserComponents/UserProtectedRoute';
@@ -27,7 +28,7 @@ export default function QuizPage() {
   const [quizState, setQuizState] = useState<QuizState | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [hasAttempted, setHasAttempted] = useState(false);
-  const [quizDuration, setQuizDuration] = useState<number>(0); // ✅ Store duration from backend
+  const [quizDuration, setQuizDuration] = useState<number>(0);
 
   const params = useParams();
   const quizId = parseInt(params.quizId as string);
@@ -86,7 +87,7 @@ export default function QuizPage() {
     }
   }, [quizId, hasAttempted, numericUserId]);
 
-  // ✅ Initialize quiz state with duration fetch
+  // ✅ Initialize quiz state with server action for duration
   const initializeQuizState = async (questions: Question[]) => {
     if (questions.length === 0) {
       setError('No questions found for this quiz.');
@@ -105,24 +106,15 @@ export default function QuizPage() {
     let endTime: Date | null = null;
     let timeRemaining = 0;
 
-    // ✅ Try to fetch quiz duration
+    // ✅ Use server action instead of client-side fetch
     let duration = 60; // fallback duration in minutes
     try {
-      const response = await fetch(`http://localhost:5000/api/quiz/${quizId}`, {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const quizData = await response.json();
-        if (quizData.duration) {
-          duration = quizData.duration;
-          setQuizDuration(duration);
-        }
-      } else {
-        console.warn('Failed to fetch quiz duration. Using fallback.');
-      }
+      console.log("Fetching quiz duration for quiz ID:", quizId);
+      duration = await fetchQuizDuration(quizId);
+      setQuizDuration(duration);
     } catch (err) {
       console.error('Error fetching quiz duration:', err);
+      // Continue with fallback duration
     }
 
     if (savedEndTime) {
@@ -168,7 +160,6 @@ export default function QuizPage() {
     localStorage.setItem(LS_ANSWERS_KEY, JSON.stringify(updatedAnswers));
   };
 
-  // ✅ Navigation
   const handleNextQuestion = () => {
     if (!quizState || quizState.currentQuestionIndex >= questions.length - 1) return;
 
@@ -185,12 +176,10 @@ export default function QuizPage() {
     localStorage.setItem(LS_INDEX_KEY, newIndex.toString());
   };
 
-  // ✅ Time update
   const handleTimeUpdate = useCallback((newTime: number) => {
     setQuizState(prev => prev ? { ...prev, timeRemaining: newTime } : null);
   }, []);
 
-  // ✅ Submit
   const handleSubmit = async () => {
     if (submitting || !quizState) return;
     setSubmitting(true);

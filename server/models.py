@@ -29,7 +29,7 @@ class Subject(db.Model):
     description = db.Column(db.String(200))
     chapters = db.relationship('Chapter', backref='subject', 
                              cascade='all, delete-orphan', 
-                             passive_deletes=True)
+                             passive_deletes=True)  # Remove lazy='dynamic'
 
 class Chapter(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -40,7 +40,7 @@ class Chapter(db.Model):
                           nullable=False)
     quizzes = db.relationship('Quiz', backref='chapter', 
                             cascade='all, delete-orphan', 
-                            passive_deletes=True)
+                            passive_deletes=True)  # Remove lazy='dynamic'
 
 class Quiz(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -53,8 +53,7 @@ class Quiz(db.Model):
     remarks = db.Column(db.String(200))
     questions = db.relationship('Question', backref='quiz', 
                               cascade='all, delete-orphan', 
-                              passive_deletes=True)
-    scores = db.relationship('Score', backref='quiz', cascade='all, delete-orphan', passive_deletes=True)
+                              passive_deletes=True)  # Remove lazy='dynamic'
 
 class Question(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -62,10 +61,10 @@ class Question(db.Model):
                        db.ForeignKey('quiz.id', ondelete='CASCADE'), 
                        nullable=False)
     question_statement = db.Column(db.String(500), nullable=False)
-    option1 = db.Column(db.Integer, nullable=False)
-    option2 = db.Column(db.Integer, nullable=False)
-    option3 = db.Column(db.Integer, nullable=False)
-    option4 = db.Column(db.Integer, nullable=False)
+    option1 = db.Column(db.String, nullable=False)
+    option2 = db.Column(db.String, nullable=False)
+    option3 = db.Column(db.String, nullable=False)
+    option4 = db.Column(db.String, nullable=False)
     correct_option = db.Column(db.Integer, nullable=False)
     scores = db.relationship('Score', backref='question', 
                            cascade='all, delete-orphan', 
@@ -93,5 +92,6 @@ class QuizAttempt(db.Model):
     start_time = db.Column(db.DateTime, default=datetime.utcnow)
     end_time = db.Column(db.DateTime)
     time_spent = db.Column(db.Integer)
+    # This relationship already creates the backref 'quiz' - remove the duplicate in Quiz model
     user = db.relationship('User', backref='quiz_attempts')
     quiz = db.relationship('Quiz', backref='quiz_attempts')

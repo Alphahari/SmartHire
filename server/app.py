@@ -13,8 +13,9 @@ from celery.schedules import crontab
 from flask_mail import Mail
 from extensions import cache, limiter
 
-
 load_dotenv()
+
+from ai_report_generator import ai_report_generator
 
 app = Flask(__name__)
 CORS(app, 
@@ -183,6 +184,65 @@ def trigger_all_performance_export():
         return jsonify({"message": "All users performance export started! You'll receive an email shortly."}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/user/ai-report', methods=['GET'])
+@limiter.limit("1 per 10 minutes")
+@jwt_required()
+def generate_ai_report():
+    """Generate and return an AI-powered performance report for the current user"""
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Calculate date range for the current month
+        now = datetime.utcnow()
+        first_day_current = now.replace(day=1)
+        last_day_prev = first_day_current - timedelta(days=1)
+        first_day_prev = last_day_prev.replace(day=1)
+        
+        # Get performance data
+        performance_data = ai_report_generator.get_user_performance_data(
+            user.id, first_day_prev, first_day_current
+        )
+        
+        if not performance_data['quiz_performance']:
+            return jsonify({"error": "No quiz data available for analysis"}), 400
+        
+        # Generate AI report
+        ai_report = ai_report_generator.generate_insightful_report(
+            performance_data,
+            user.full_name,
+            first_day_prev.strftime("%B %Y")
+        )
+        
+        return jsonify({
+            "message": "AI report generated successfully",
+            "report": ai_report,
+            "performance_summary": {
+                "total_quizzes": performance_data['total_quizzes'],
+                "overall_accuracy": performance_data['overall_accuracy'],
+                "total_questions": performance_data['total_questions'],
+                "total_correct": performance_data['total_correct']
+            },
+            "month": first_day_prev.strftime("%B %Y")
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": f"Failed to generate AI report: {str(e)}"}), 500
+
+# Update the celery beat schedule to use the AI-enhanced reports
+celery.conf.beat_schedule = {
+    'minute-check': {
+        'task': 'celery_worker.send_daily_reminders',
+        'schedule': crontab(minute='*'),
+    },
+    'monthly-reports': {
+        'task': 'celery_worker.send_ai_enhanced_monthly_reports',  # Updated to use AI reports
+        'schedule': crontab(day_of_month=1, hour=14, minute=30)
+    }
+}
 
 @app.errorhandler(429)
 def ratelimit_handler(e):

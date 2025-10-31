@@ -129,10 +129,20 @@ def register_admin_routes(api):
             subject = Subject.query.get(id)
             if not subject:
                 return {'message': 'Subject not found'}, 404
-            db.session.delete(subject)
-            db.session.commit()
-            # cache.delete("user_subjects")
-            return {'message': 'Subject deleted'}
+            
+            try:
+                # The cascade should automatically delete chapters, quizzes, questions, etc.
+                db.session.delete(subject)
+                db.session.commit()
+                
+                # Clear relevant caches
+                # cache.delete("user_subjects")
+                # cache.delete_memoized("user_subjects")
+                
+                return {'message': 'Subject and all associated data deleted successfully'}, 200
+            except Exception as e:
+                db.session.rollback()
+                return {'error': f'Failed to delete subject: {str(e)}'}, 500
 
     class AdminChapters(Resource):
         # @admin_required
@@ -174,16 +184,25 @@ def register_admin_routes(api):
             # cache.delete(f"subject_{chapter.subject_id}")
             return {'message': 'Chapter updated'}
 
-        # @admin_required
         def delete(self, id):
             chapter = Chapter.query.get(id)
             if not chapter:
                 return {'message': 'Chapter not found'}, 404
-            db.session.delete(chapter)
-            db.session.commit()
-            # cache.delete(f"subject_{chapter.subject_id}")
-            return {'message': 'Chapter deleted'}
-
+            
+            subject_id = chapter.subject_id
+            
+            try:
+                # Cascade should automatically delete quizzes, questions, etc.
+                db.session.delete(chapter)
+                db.session.commit()
+                
+                # Clear relevant caches
+                # cache.delete(f"subject_{subject_id}")
+                
+                return {'message': 'Chapter and all associated quizzes deleted successfully'}, 200
+            except Exception as e:
+                db.session.rollback()
+                return {'error': f'Failed to delete chapter: {str(e)}'}, 500
     class AdminQuizzes(Resource):
         # @admin_required
         def post(self):
@@ -264,15 +283,25 @@ def register_admin_routes(api):
             # cache.delete(f"chapter_{chapter_id}")
             return jsonify(format_response(quiz))
 
-        # @admin_required
         def delete(self, id):
             quiz = Quiz.query.get(id)
             if not quiz:
                 return {'error': 'Quiz not found'}, 404
-            db.session.delete(quiz)
-            db.session.commit()
-            # cache.delete(f"chapter_{quiz.chapter_id}")
-            return {'message': 'Quiz deleted successfully'}, 200
+            
+            chapter_id = quiz.chapter_id
+            
+            try:
+                # Cascade should automatically delete questions, scores, attempts
+                db.session.delete(quiz)
+                db.session.commit()
+                
+                # Clear relevant caches
+                # cache.delete(f"chapter_{chapter_id}")
+                
+                return {'message': 'Quiz and all associated questions deleted successfully'}, 200
+            except Exception as e:
+                db.session.rollback()
+                return {'error': f'Failed to delete quiz: {str(e)}'}, 500
 
     class AdminQuestions(Resource):
         # @admin_required

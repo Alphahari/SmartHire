@@ -72,3 +72,5 @@ WTForms
 zipp
 flask_cors
 celery[redis]
+langchain
+langchain-groq

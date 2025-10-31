@@ -11,7 +11,7 @@ const UserSidebar = ({ activeTab, setActiveTab }: UserSidebarProps) => {
     { id: 'subjects', label: 'My Subjects', icon: '📚' },
     { id: 'stats', label: 'Statistics', icon: '📊' },
     { id: 'past-quizzes', label: 'Past Quizzes', icon: '📝' }, // Changed from 'progress' to 'past-quizzes'
-    { id: 'achievements', label: 'Achievements', icon: '🏆' },
+    { id: 'coding', label: 'Coding', icon: '📝' },
   ];
 
   return (
