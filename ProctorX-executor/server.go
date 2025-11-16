@@ -6,12 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
@@ -21,25 +19,31 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+type TestCases struct {
+	Input          string `json:"input"`
+	ExpectedOutput string `json:"expected_output"`
+}
+
 type Task struct {
-	Lang string `json:"lang"`
-	Code string `json:"code"`
-	ID   string `json:"id"`
+	Lang      string      `json:"lang"`
+	Code      string      `json:"code"`
+	ID        string      `json:"id"`
+	TestCases []TestCases `json:"test_cases"`
 }
 
 func main() {
 
-	envErr := godotenv.Load(".env")
-	if envErr != nil {
-		log.Fatal("Error loading env file", envErr)
+	// Load environment variables
+	if err := godotenv.Load(".env"); err != nil {
+		log.Fatal("Error loading .env file:", err)
 	}
 
+	// Main context for long-running worker
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	redisClient := initRedisClient()
 	dockerClient, err := initDockerClient()
-
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -48,65 +52,77 @@ func main() {
 	fmt.Println("Redis Client created!")
 	fmt.Println("Docker Client created!")
 
+	// Begin infinite job processing loop
 	processSubmission(ctx, redisClient, dockerClient)
 }
 
+/*
+-------------------------------------------------------
+------------------ REDIS JOB LOOP ---------------------
+-------------------------------------------------------
+*/
+
 func processSubmission(ctx context.Context, redisClient *redis.Client, dockerClient *client.Client) {
 	for {
+		// Wait for next submission from queue
 		submission := redisClient.BRPop(ctx, 0, "submissions")
+
 		result, err := submission.Result()
 		if err != nil {
-			log.Printf("Error retrieving result from BRPop: %v", err)
-			return
+			log.Printf("Error retrieving data from BRPop: %v", err)
+			continue
 		}
 
 		if len(result) < 2 {
-			log.Println("Unexpected Redis BRPop response, skipping...")
-			return
+			log.Println("Invalid Redis BRPop response. Skipping...")
+			continue
 		}
 
 		jsonData := result[1]
 
 		var task Task
-		err = json.Unmarshal([]byte(jsonData), &task)
-		if err != nil {
-			log.Printf("Error unmarshaling JSON data: %v", err)
-			return
+		if err := json.Unmarshal([]byte(jsonData), &task); err != nil {
+			log.Printf("Error unmarshaling JSON: %v", err)
+			continue
 		}
 
+		// Create file for user code
 		filename := uuid.NewString() + "." + task.Lang
-		filename = strings.Replace(filename, "-", "_", -1)
+		filename = strings.ReplaceAll(filename, "-", "_")
 
+		// Java requires filename to match `public class`
 		if task.Lang == "java" {
 			filename = "Main_" + filename
 		}
 
-		file, err := os.Create("executions/" + filename)
+		filePath := "executions/" + filename
+		codeFile, err := os.Create(filePath)
 		if err != nil {
 			panic(err)
 		}
 
-		var finalCode string
-
+		// Prepare code
+		finalCode := task.Code
 		if task.Lang == "java" {
-			finalCode = strings.Replace(task.Code, "public class Main", "public class "+strings.Split(filename, ".")[0], -1)
-		} else {
-			finalCode = task.Code
+			className := strings.Split(filename, ".")[0]
+			finalCode = strings.Replace(task.Code, "public class Main", "public class "+className, 1)
 		}
 
-		_, err = file.WriteString(finalCode)
-		if err != nil {
+		if _, err := codeFile.WriteString(finalCode); err != nil {
 			panic(err)
 		}
+		codeFile.Close()
 
-		file.Close()
+		fmt.Printf("Processing %s submission.\n", task.Lang)
 
-		fmt.Printf("Processing task - Language: %s\nCode: %s\n", task.Lang, task.Code)
-
+		// Determine run command + container image
 		command := getRunCommand(task.Lang, filename)
+		image := getDockerImage(task.Lang)
 
-		compute, err := dockerClient.ContainerCreate(ctx, &container.Config{
-			Image: getDockerImage(task.Lang),
+		// Create container for execution
+		containerResp, err := dockerClient.ContainerCreate(ctx, &container.Config{
+			Image: image,
+			// Command is NOT inserted here — executed via ContainerExec later.
 		}, &container.HostConfig{
 			Mounts: []mount.Mount{
 				{
@@ -118,147 +134,141 @@ func processSubmission(ctx context.Context, redisClient *redis.Client, dockerCli
 		}, nil, nil, "")
 
 		if err != nil {
-			log.Printf("Error creating container: %s", err)
-			return
+			log.Printf("Error creating container: %v", err)
+			continue
 		}
 
-		containerID := compute.ID
-
-		executeTaskInContainer(ctx, dockerClient, command, redisClient, containerID, task, filename)
+		// Run test cases inside container
+		executeTaskInContainer(ctx, dockerClient, command, redisClient, containerResp.ID, task, filename)
 	}
 }
 
-func executeTaskInContainer(ctx context.Context, dockerClient *client.Client, command []string, redisClient *redis.Client, containerID string, task Task, filename string) {
+/*
+-------------------------------------------------------
+--------- EXECUTION OF CODE INSIDE DOCKER -------------
+-------------------------------------------------------
+*/
 
-	execCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	err := dockerClient.ContainerStart(execCtx, containerID, container.StartOptions{})
-	if err != nil {
+func executeTaskInContainer(
+	ctx context.Context,
+	dockerClient *client.Client,
+	baseCommand []string,
+	redisClient *redis.Client,
+	containerID string,
+	task Task,
+	filename string,
+) {
+	// Start container
+	if err := dockerClient.ContainerStart(ctx, containerID, container.StartOptions{}); err != nil {
 		log.Printf("Error starting container %s: %v", containerID, err)
 		return
 	}
 
-	exec, err := dockerClient.ContainerExecCreate(execCtx, containerID, container.ExecOptions{
-		Cmd:          command,
-		AttachStdout: true,
-		AttachStderr: true,
-	})
+	var allResults []map[string]string
 
-	if err != nil {
-		log.Printf("Error creating exec: %s", err)
-		return
-	}
+	// baseCommand is ["sh", "-c", "<real_cmd>"]
+	realCmd := baseCommand[2] // Extract actual compiler+run command
 
-	execID := exec.ID
+	for i, tc := range task.TestCases {
 
-	response, err := dockerClient.ContainerExecAttach(execCtx, execID, container.ExecAttachOptions{
-		Tty: false,
-	})
-	if err != nil {
-		log.Printf("Error attaching exec to container: %s", err)
-		return
-	}
-	defer response.Close()
+		// Timeout for each test
+		execCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 
-	err = dockerClient.ContainerExecStart(execCtx, execID, container.ExecStartOptions{})
-	if err != nil {
-		log.Printf("Error starting container exec: %s", err)
-		return
-	}
+		/*
+			⭐ FIX FOR JAVA/C++ INPUT:
+			We wrap the entire compile+run command in a second "sh -c"
+			so that echo pipes into the _final executable_, not the compiler.
+		*/
+		safeWrapped := fmt.Sprintf(
+			"echo \"%s\" | sh -c '%s'",
+			tc.Input,
+			realCmd,
+		)
 
-	done := make(chan struct{})
+		cmd := []string{"sh", "-c", safeWrapped}
 
-	go func() {
-		for {
-			inspect, err := dockerClient.ContainerExecInspect(ctx, execID)
-			if err != nil {
-				log.Printf("Error inspecting exec: %s", err)
-				break
-			}
+		// Create execution environment
+		execID, err := dockerClient.ContainerExecCreate(execCtx, containerID, container.ExecOptions{
+			Cmd:          cmd,
+			AttachStdout: true,
+			AttachStderr: true,
+		})
 
-			if !inspect.Running {
-				break
-			}
-
-			time.Sleep(100 * time.Millisecond)
+		if err != nil {
+			log.Printf("Exec create failed test %d: %v", i, err)
+			cancel()
+			continue
 		}
-		close(done)
-	}()
 
-	select {
-	case <-done:
-		readLogs(response, ctx, redisClient, task.ID)
-	case <-execCtx.Done():
-		if execCtx.Err() == context.DeadlineExceeded {
-			publishToRedis(ctx, redisClient, task.ID, "Time Limit Exceeded")
-			if err := dockerClient.ContainerKill(ctx, containerID, "SIGKILL"); err != nil {
-				log.Printf("Failed to kill container: %v", err)
-			}
+		// Attach to running process
+		resp, err := dockerClient.ContainerExecAttach(execCtx, execID.ID, container.ExecAttachOptions{Tty: false})
+		if err != nil {
+			log.Printf("Exec attach failed test %d: %v", i, err)
+			cancel()
+			continue
 		}
+
+		var stdoutBuf, stderrBuf bytes.Buffer
+		done := make(chan struct{})
+
+		// Read output
+		go func() {
+			stdcopy.StdCopy(&stdoutBuf, &stderrBuf, resp.Reader)
+			close(done)
+		}()
+
+		// Evaluate execution result
+		select {
+		case <-done:
+			resp.Close()
+			output := strings.TrimSpace(stdoutBuf.String())
+			errText := strings.TrimSpace(stderrBuf.String())
+
+			result := map[string]string{
+				"input":    tc.Input,
+				"expected": tc.ExpectedOutput,
+				"output":   output,
+				"error":    errText,
+			}
+
+			if errText == "" && output == strings.TrimSpace(tc.ExpectedOutput) {
+				result["status"] = "PASSED"
+			} else {
+				result["status"] = "FAILED"
+			}
+
+			allResults = append(allResults, result)
+
+		case <-execCtx.Done():
+			resp.Close()
+
+			log.Printf("Test %d timed out. Killing container...", i)
+			_ = dockerClient.ContainerKill(ctx, containerID, "SIGKILL")
+
+			allResults = append(allResults, map[string]string{
+				"input":    tc.Input,
+				"expected": tc.ExpectedOutput,
+				"output":   "",
+				"error":    "Time Limit Exceeded",
+				"status":   "TIMEOUT",
+			})
+		}
+
+		cancel()
 	}
 
+	// Send results to Redis pub/sub channel
+	resultBytes, _ := json.Marshal(allResults)
+	publishToRedis(ctx, redisClient, task.ID, string(resultBytes))
+
+	// Cleanup
 	removeUserFiles(filename, task)
 	cleanupContainer(ctx, dockerClient, containerID)
 }
 
-func readLogs(response types.HijackedResponse, ctx context.Context, redisClient *redis.Client, submissionID string) {
+/*
+-------------------------------------------------------
+-------------------- HTTP SERVER -----------------------
+-------------------------------------------------------
+*/
 
-	var stdoutBuf, stderrBuf bytes.Buffer
-
-	_, err := stdcopy.StdCopy(&stdoutBuf, &stderrBuf, response.Reader)
-	if err != nil {
-		log.Printf("Error copying output: %v", err)
-	}
-
-	stdout := stdoutBuf.String()
-	stderr := stderrBuf.String()
-
-	if stderr != "" {
-		log.Printf("Stderr: %s", stderr)
-		publishToRedis(ctx, redisClient, submissionID, stderr)
-		return
-	}
-
-	fmt.Printf("Stdout: %s\n", stdout)
-	fmt.Println("Execution completed successfully!")
-
-	publishToRedis(ctx, redisClient, submissionID, stdout)
-
-}
-
-func server() {
-	fmt.Println("Starting server on port 8080")
-	http.HandleFunc("/listContainers", func(w http.ResponseWriter, r *http.Request) {
-
-		envErr := godotenv.Load(".env")
-		if envErr != nil {
-			log.Fatal("Error loading env file", envErr)
-		}
-
-		cli, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.WithHost(os.Getenv("DOCKER_HOST")))
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer cli.Close()
-		fmt.Println("Client created!")
-
-		containers, err := cli.ContainerList(context.Background(), container.ListOptions{})
-		if err != nil {
-			panic(err)
-		}
-
-		for _, container := range containers {
-			fmt.Fprintf(w, "Container ID: %s, Image: %s, Names: %v\n", container.ID, container.Image, container.Names)
-		}
-	})
-
-	http.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("Query Parameters: ", r.URL.Query())
-		fmt.Fprintf(w, "Hello, World!")
-	})
-
-	if err := http.ListenAndServe(":8000", nil); err != nil {
-		log.Fatal(err)
-	}
-}

@@ -1,9 +1,15 @@
 // actions/codeExecution.ts
 'use server';
 
+interface TestCase {
+  input: string;
+  expected_output: string;
+}
+
 interface submissionInterface {
   lang: string;
   code: string;
+  test_cases: TestCase[];
 }
 
 export async function submitCode(submission: submissionInterface) {

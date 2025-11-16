@@ -12,14 +12,22 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+/*
+-------------------------------------------------------
+---------------- REDIS / DOCKER INIT -------------------
+-------------------------------------------------------
+*/
+
 func publishToRedis(ctx context.Context, redisClient *redis.Client, submissionID string, output string) {
 	redisClient.Publish(ctx, submissionID, output)
-	fmt.Println(output)
-	fmt.Printf("Successfully published on %s\n", submissionID)
+	fmt.Printf("Published results to %s\n", submissionID)
 }
 
 func initDockerClient() (*client.Client, error) {
-	return client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.WithHost(os.Getenv("DOCKER_HOST")))
+	return client.NewClientWithOpts(
+		client.WithAPIVersionNegotiation(),
+		client.WithHost(os.Getenv("DOCKER_HOST")),
+	)
 }
 
 func initRedisClient() *redis.Client {
@@ -31,6 +39,12 @@ func initRedisClient() *redis.Client {
 	})
 }
 
+/*
+-------------------------------------------------------
+------------------ LANGUAGE HANDLERS -------------------
+-------------------------------------------------------
+*/
+
 func getDockerImage(lang string) string {
 	images := map[string]string{
 		"py":   "python_proctorx",
@@ -38,44 +52,61 @@ func getDockerImage(lang string) string {
 		"cpp":  "cpp_proctorx",
 		"c":    "cpp_proctorx",
 	}
-
 	return images[lang]
 }
 
+/*
+	Generate the actual RUN COMMAND that will be executed in the container.
+	This command is passed into:
+
+		sh -c "<compiled/run command>"
+*/
 func getRunCommand(lang string, filename string) []string {
 
-	var command []string
-
 	switch lang {
+
 	case "py":
-		command = []string{"sh", "-c", fmt.Sprintf("python3 /executions/%s", filename)}
+		return []string{"sh", "-c", fmt.Sprintf("python3 /executions/%s", filename)}
 
 	case "java":
 		className := strings.Split(filename, ".")[0]
-		command = []string{"sh", "-c", fmt.Sprintf("javac /executions/%s && java -cp /executions %s", filename, className)}
+		return []string{"sh", "-c",
+			fmt.Sprintf("javac /executions/%s && java -cp /executions %s",
+				filename, className)}
 
 	case "cpp":
-		outFile := "/executions/" + strings.Split(filename, ".")[0]
-		command = []string{"sh", "-c", fmt.Sprintf("g++ /executions/%s -o %s && %s", filename, outFile, outFile)}
+		out := "/executions/" + strings.Split(filename, ".")[0]
+		return []string{"sh", "-c",
+			fmt.Sprintf("g++ /executions/%s -o %s && %s",
+				filename, out, out)}
 
 	case "c":
-		outFile := "/executions/" + strings.Split(filename, ".")[0]
-		command = []string{"sh", "-c", fmt.Sprintf("gcc /executions/%s -o %s && %s", filename, outFile, outFile)}
-
-	default:
-		log.Printf("Unsupported language: %s", lang)
-		return nil
+		out := "/executions/" + strings.Split(filename, ".")[0]
+		return []string{"sh", "-c",
+			fmt.Sprintf("gcc /executions/%s -o %s && %s",
+				filename, out, out)}
 	}
 
-	return command
+	log.Printf("Unsupported language: %s", lang)
+	return nil
 }
+
+/*
+-------------------------------------------------------
+---------------- CLEANUP HELPERS -----------------------
+-------------------------------------------------------
+*/
 
 func removeUserFiles(filename string, task Task) {
 	os.Remove("executions/" + filename)
-	if task.Lang == "java" {
-		os.Remove("executions/" + strings.Split(filename, ".")[0] + ".class")
-	} else if task.Lang == "cpp" || task.Lang == "c" {
-		os.Remove("executions/" + strings.Split(filename, ".")[0])
+
+	base := "executions/" + strings.Split(filename, ".")[0]
+
+	switch task.Lang {
+	case "java":
+		os.Remove(base + ".class")
+	case "cpp", "c":
+		os.Remove(base)
 	}
 }
 
