@@ -1,3 +1,4 @@
+// app/admin/page.tsx (update)
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -8,6 +9,7 @@ import AdminProtectedRoute from '@/components/AdminComponents/AdminProtectedRout
 import AdminSidebar from '@/components/AdminComponents/AdminSidebar';
 import StatsOverview from '@/components/AdminComponents/StatsOverview';
 import SubjectManagement from '@/components/Subject/SubjectManagement';
+import CodingManagement from '@/components/AdminComponents/CodingManagement'; // Import the new component
 import UserManagement from '@/components/AdminComponents/UserManagement';
 import AdminAnalytics from '@/components/AdminComponents/AdminAnalytics';
 
@@ -18,7 +20,6 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const { data: session } = useSession();
 
-  // ✅ Extracted fetch function for reuse
   const getSubjects = async () => {
     try {
       setLoading(true);
@@ -36,7 +37,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // ✅ Reuse getSubjects in useEffect
   useEffect(() => {
     if (session) {
       getSubjects();
@@ -56,10 +56,12 @@ export default function AdminDashboard() {
             onSubjectChange={getSubjects}
           />
         );
+      case 'coding':
+        return <CodingManagement onCodingChange={getSubjects} />; // New coding tab
       case 'users':
         return <UserManagement onUserChange={getSubjects} />;
       case 'analytics':
-        return <AdminAnalytics />; // Add this line
+        return <AdminAnalytics />;
       default:
         return <StatsOverview subjects={subjects} />;
     }

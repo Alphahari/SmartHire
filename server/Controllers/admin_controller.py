@@ -1,6 +1,6 @@
 from flask import jsonify, request
 from flask_restful import Resource
-from models import QuizAttempt, db, User, Subject, Chapter, Quiz, Question, Score
+from models import QuizAttempt, Submission, db, User, Subject, Chapter, Quiz, Question, Score, Topic, CodingQuestion, TestCase
 from functools import wraps
 from datetime import datetime, timedelta
 import pytz
@@ -736,3 +736,370 @@ def register_admin_routes(api):
     api.add_resource(AdminSubjectPerformance, '/admin/stats/subject-performance')
     api.add_resource(AdminQuizActivity, '/admin/stats/quiz-activity')
     api.add_resource(AdminPerformanceDistribution, '/admin/stats/performance-distribution')
+
+    class AdminTopics(Resource):
+        def get(self):
+            """Get all coding topics"""
+            topics = Topic.query.all()
+            return jsonify([{
+                'id': topic.id,
+                'name': topic.name,
+                'description': topic.description,
+                'question_count': len(topic.questions)
+            } for topic in topics])
+
+        def post(self):
+            """Create a new coding topic"""
+            data = request.get_json()
+            name = data.get('name')
+            description = data.get('description')
+
+            if not name:
+                return {'error': 'Topic name is required'}, 400
+
+            # Check if topic already exists
+            existing_topic = Topic.query.filter_by(name=name).first()
+            if existing_topic:
+                return {'error': 'Topic with this name already exists'}, 400
+
+            new_topic = Topic(name=name, description=description)
+            db.session.add(new_topic)
+            db.session.commit()
+
+            return {
+                'id': new_topic.id,
+                'name': new_topic.name,
+                'description': new_topic.description
+            }, 201
+
+    class AdminTopic(Resource):
+        def get(self, id):
+            """Get a specific topic by ID"""
+            topic = Topic.query.get(id)
+            if not topic:
+                return {'error': 'Topic not found'}, 404
+
+            return {
+                'id': topic.id,
+                'name': topic.name,
+                'description': topic.description,
+                'questions': [{
+                    'id': q.id,
+                    'title': q.title,
+                    'difficulty': q.difficulty
+                } for q in topic.questions]
+            }
+
+        def put(self, id):
+            """Update a topic"""
+            topic = Topic.query.get(id)
+            if not topic:
+                return {'error': 'Topic not found'}, 404
+
+            data = request.get_json()
+            name = data.get('name')
+            description = data.get('description')
+
+            if name:
+                # Check if name is already taken by another topic
+                existing = Topic.query.filter(Topic.name == name, Topic.id != id).first()
+                if existing:
+                    return {'error': 'Topic with this name already exists'}, 400
+                topic.name = name
+
+            if description is not None:
+                topic.description = description
+
+            db.session.commit()
+            return {'message': 'Topic updated successfully'}
+
+        def delete(self, id):
+            """Delete a topic"""
+            topic = Topic.query.get(id)
+            if not topic:
+                return {'error': 'Topic not found'}, 404
+
+            try:
+                db.session.delete(topic)
+                db.session.commit()
+                return {'message': 'Topic deleted successfully'}, 200
+            except Exception as e:
+                db.session.rollback()
+                return {'error': f'Failed to delete topic: {str(e)}'}, 500
+
+    # ===== CODING QUESTIONS CRUD =====
+    class AdminCodingQuestions(Resource):
+        def get(self):
+            """Get all coding questions with pagination"""
+            page = request.args.get('page', 1, type=int)
+            per_page = request.args.get('per_page', 20, type=int)
+            topic_id = request.args.get('topic_id', type=int)
+
+            query = CodingQuestion.query
+
+            if topic_id:
+                query = query.filter_by(topic_id=topic_id)
+
+            questions = query.options(joinedload(CodingQuestion.topic)).paginate(
+                page=page, per_page=per_page, error_out=False
+            )
+
+            return jsonify({
+                'questions': [{
+                    'id': q.id,
+                    'title': q.title,
+                    'difficulty': q.difficulty,
+                    'topic_id': q.topic_id,
+                    'topic_name': q.topic.name,
+                    'function_signature': q.function_signature
+                } for q in questions.items],
+                'total': questions.total,
+                'pages': questions.pages,
+                'current_page': questions.page
+            })
+
+        def post(self):
+            """Create a new coding question"""
+            data = request.get_json()
+            
+            required_fields = ['title', 'description', 'function_signature', 'topic_id']
+            for field in required_fields:
+                if not data.get(field):
+                    return {'error': f'{field} is required'}, 400
+
+            # Verify topic exists
+            topic = Topic.query.get(data['topic_id'])
+            if not topic:
+                return {'error': 'Topic not found'}, 404
+
+            new_question = CodingQuestion(
+                title=data['title'],
+                description=data['description'],
+                function_signature=data['function_signature'],
+                constraints=data.get('constraints'),
+                difficulty=data.get('difficulty', 'medium'),
+                topic_id=data['topic_id']
+            )
+
+            db.session.add(new_question)
+            db.session.commit()
+
+            return {
+                'id': new_question.id,
+                'title': new_question.title,
+                'description': new_question.description,
+                'function_signature': new_question.function_signature,
+                'constraints': new_question.constraints,
+                'difficulty': new_question.difficulty,
+                'topic_id': new_question.topic_id
+            }, 201
+
+    class AdminCodingQuestion(Resource):
+        def get(self, id):
+            """Get a specific coding question by ID"""
+            question = CodingQuestion.query.options(
+                joinedload(CodingQuestion.topic),
+                joinedload(CodingQuestion.test_cases)
+            ).get(id)
+
+            if not question:
+                return {'error': 'Coding question not found'}, 404
+
+            return {
+                'id': question.id,
+                'title': question.title,
+                'description': question.description,
+                'function_signature': question.function_signature,
+                'constraints': question.constraints,
+                'difficulty': question.difficulty,
+                'topic_id': question.topic_id,
+                'topic_name': question.topic.name,
+                'test_cases': [{
+                    'id': tc.id,
+                    'input_data': tc.input_data,
+                    'expected_output': tc.expected_output,
+                    'is_sample': tc.is_sample
+                } for tc in question.test_cases]
+            }
+
+        def put(self, id):
+            """Update a coding question"""
+            question = CodingQuestion.query.get(id)
+            if not question:
+                return {'error': 'Coding question not found'}, 404
+
+            data = request.get_json()
+            
+            # Update fields if provided
+            fields = ['title', 'description', 'function_signature', 'constraints', 'difficulty', 'topic_id']
+            for field in fields:
+                if field in data:
+                    setattr(question, field, data[field])
+
+            # Verify topic exists if being updated
+            if 'topic_id' in data:
+                topic = Topic.query.get(data['topic_id'])
+                if not topic:
+                    return {'error': 'Topic not found'}, 404
+
+            db.session.commit()
+            return {'message': 'Coding question updated successfully'}
+
+        def delete(self, id):
+            """Delete a coding question"""
+            question = CodingQuestion.query.get(id)
+            if not question:
+                return {'error': 'Coding question not found'}, 404
+
+            try:
+                db.session.delete(question)
+                db.session.commit()
+                return {'message': 'Coding question deleted successfully'}, 200
+            except Exception as e:
+                db.session.rollback()
+                return {'error': f'Failed to delete coding question: {str(e)}'}, 500
+
+    # ===== TEST CASES CRUD =====
+    class AdminTestCases(Resource):
+        def get(self, question_id):
+            """Get all test cases for a coding question"""
+            question = CodingQuestion.query.get(question_id)
+            if not question:
+                return {'error': 'Coding question not found'}, 404
+
+            test_cases = TestCase.query.filter_by(question_id=question_id).all()
+            
+            return jsonify([{
+                'id': tc.id,
+                'input_data': tc.input_data,
+                'expected_output': tc.expected_output,
+                'is_sample': tc.is_sample
+            } for tc in test_cases])
+
+        def post(self, question_id):
+            """Create a new test case for a coding question"""
+            question = CodingQuestion.query.get(question_id)
+            if not question:
+                return {'error': 'Coding question not found'}, 404
+
+            data = request.get_json()
+            required_fields = ['input_data', 'expected_output']
+            for field in required_fields:
+                if not data.get(field):
+                    return {'error': f'{field} is required'}, 400
+
+            new_test_case = TestCase(
+                question_id=question_id,
+                input_data=data['input_data'],
+                expected_output=data['expected_output'],
+                is_sample=data.get('is_sample', False)
+            )
+
+            db.session.add(new_test_case)
+            db.session.commit()
+
+            return {
+                'id': new_test_case.id,
+                'input_data': new_test_case.input_data,
+                'expected_output': new_test_case.expected_output,
+                'is_sample': new_test_case.is_sample
+            }, 201
+
+    class AdminTestCase(Resource):
+        def get(self, id):
+            """Get a specific test case by ID"""
+            test_case = TestCase.query.get(id)
+            if not test_case:
+                return {'error': 'Test case not found'}, 404
+
+            return {
+                'id': test_case.id,
+                'input_data': test_case.input_data,
+                'expected_output': test_case.expected_output,
+                'is_sample': test_case.is_sample,
+                'question_id': test_case.question_id
+            }
+
+        def put(self, id):
+            """Update a test case"""
+            test_case = TestCase.query.get(id)
+            if not test_case:
+                return {'error': 'Test case not found'}, 404
+
+            data = request.get_json()
+            fields = ['input_data', 'expected_output', 'is_sample']
+            for field in fields:
+                if field in data:
+                    setattr(test_case, field, data[field])
+
+            db.session.commit()
+            return {'message': 'Test case updated successfully'}
+
+        def delete(self, id):
+            """Delete a test case"""
+            test_case = TestCase.query.get(id)
+            if not test_case:
+                return {'error': 'Test case not found'}, 404
+
+            try:
+                db.session.delete(test_case)
+                db.session.commit()
+                return {'message': 'Test case deleted successfully'}, 200
+            except Exception as e:
+                db.session.rollback()
+                return {'error': f'Failed to delete test case: {str(e)}'}, 500
+
+    # ===== SUBMISSIONS MANAGEMENT =====
+    class AdminSubmissions(Resource):
+        def get(self):
+            """Get all coding submissions with filtering"""
+            page = request.args.get('page', 1, type=int)
+            per_page = request.args.get('per_page', 20, type=int)
+            question_id = request.args.get('question_id', type=int)
+            user_id = request.args.get('user_id', type=int)
+            status = request.args.get('status')
+
+            query = Submission.query.options(
+                joinedload(Submission.user),
+                joinedload(Submission.question).joinedload(CodingQuestion.topic)
+            )
+
+            if question_id:
+                query = query.filter_by(question_id=question_id)
+            if user_id:
+                query = query.filter_by(user_id=user_id)
+            if status:
+                query = query.filter_by(status=status)
+
+            submissions = query.order_by(Submission.timestamp.desc()).paginate(
+                page=page, per_page=per_page, error_out=False
+            )
+
+            return jsonify({
+                'submissions': [{
+                    'id': s.id,
+                    'user_id': s.user_id,
+                    'user_name': s.user.full_name,
+                    'question_id': s.question_id,
+                    'question_title': s.question.title,
+                    'topic_name': s.question.topic.name,
+                    'language': s.language,
+                    'status': s.status,
+                    'passed_testcases': s.passed_testcases,
+                    'total_testcases': s.total_testcases,
+                    'time_taken': s.time_taken,
+                    'timestamp': s.timestamp.isoformat()
+                } for s in submissions.items],
+                'total': submissions.total,
+                'pages': submissions.pages,
+                'current_page': submissions.page
+            })
+
+
+    api.add_resource(AdminTopics, '/admin/coding/topics')
+    api.add_resource(AdminTopic, '/admin/coding/topics/<int:id>')
+    api.add_resource(AdminCodingQuestions, '/admin/coding/questions')
+    api.add_resource(AdminCodingQuestion, '/admin/coding/questions/<int:id>')
+    api.add_resource(AdminTestCases, '/admin/coding/questions/<int:question_id>/test-cases')
+    api.add_resource(AdminTestCase, '/admin/coding/test-cases/<int:id>')
+    api.add_resource(AdminSubmissions, '/admin/coding/submissions')

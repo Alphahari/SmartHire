@@ -1,17 +1,18 @@
 from flask import Flask, jsonify, request
-from models import db, User, Role
-from flask_restful import Api
-from Controllers.Basic import register_routes
-import bcrypt
-import os
-from dotenv import load_dotenv
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
+from flask_restful import Api
 from flask_cors import CORS
+from flask_mail import Mail
+from flask_migrate import Migrate
+from models import db, User, Role
+from Controllers.Basic import register_routes
+from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from celery import Celery
 from celery.schedules import crontab
-from flask_mail import Mail
 from extensions import cache, limiter
+import os
+import bcrypt
 
 load_dotenv()
 
@@ -54,6 +55,7 @@ app.config['CACHE_REDIS_URL'] = REDIS_URL
 app.config['CACHE_DEFAULT_TIMEOUT'] = 300
 
 db.init_app(app)
+migrate = Migrate(app,db)
 jwt = JWTManager(app)
 mail = Mail(app) 
 api = Api(app, prefix='/api')
@@ -99,7 +101,7 @@ celery.conf.beat_schedule = {
         'schedule': crontab(minute='*'),
     },
     'monthly-reports': {
-        'task': 'celery_worker.send_monthly_reports',
+        'task': 'celery_worker.send_ai_enhanced_monthly_reports',
         'schedule': crontab(day_of_month=1, hour=14, minute=30)
     }
 }
@@ -135,8 +137,8 @@ def update_reminder_time():
 @limiter.limit("1 per 1 minute") 
 def trigger_report_email_task():
     try:
-        celery.send_task('celery_worker.send_monthly_reports')
-        return jsonify({"message": "Monthly report task queued!"}), 200
+        celery.send_task('celery_worker.send_ai_enhanced_monthly_reports')
+        return jsonify({"message": "Monthly AI report task queued!"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -251,9 +253,9 @@ def ratelimit_handler(e):
         message="Please wait before requesting another export"
     ), 429
 
+with app.app_context():
+    create_admin_user()
+    register_routes(api)
+
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-        create_admin_user()
-        register_routes(api)
     app.run(debug=True)

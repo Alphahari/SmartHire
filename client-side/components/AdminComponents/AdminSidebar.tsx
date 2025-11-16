@@ -1,3 +1,4 @@
+// components/AdminComponents/AdminSidebar.tsx (update)
 import { Dispatch, SetStateAction } from 'react';
 import Logout from '../Auth/Logout';
 
@@ -7,12 +8,13 @@ interface AdminSidebarProps {
 }
 
 const AdminSidebar = ({ activeTab, setActiveTab }: AdminSidebarProps) => {
-const menuItems = [
-  { id: 'overview', label: 'Overview', icon: '📊' },
-  { id: 'subjects', label: 'Subjects', icon: '📚' },
-  { id: 'users', label: 'Users', icon: '👥' },
-  { id: 'analytics', label: 'Analytics', icon: '📈' },
-];
+  const menuItems = [
+    { id: 'overview', label: 'Overview', icon: '📊' },
+    { id: 'subjects', label: 'Subjects', icon: '📚' },
+    { id: 'coding', label: 'Coding', icon: '💻' }, // New coding tab
+    { id: 'users', label: 'Users', icon: '👥' },
+    { id: 'analytics', label: 'Analytics', icon: '📈' },
+  ];
 
   return (
     <div className="fixed left-0 top-0 h-full w-64 bg-gray-800 text-white shadow-lg">

@@ -1,8 +1,9 @@
 from flask import jsonify, request
 from flask_restful import Resource
-from models import Subject, Chapter, Quiz
+from models import Subject, Chapter, Quiz, Topic, CodingQuestion, TestCase, Submission, TestCaseResult, db
 from sqlalchemy.orm import joinedload
 from extensions import cache
+from datetime import datetime
 
 def register_user_routes(api): 
     class Subjects(Resource):   
@@ -156,3 +157,85 @@ def register_user_routes(api):
                 c.id: c.subject.id for c in chapters
             })
     api.add_resource(ChapterSubjects, '/chapters/subjects')
+
+    class UserCodingTopics(Resource):
+        def get(self):
+            """Get all coding topics for users"""
+            topics = Topic.query.all()
+            return jsonify([{
+                'id': topic.id,
+                'name': topic.name,
+                'description': topic.description,
+                'question_count': len(topic.questions)
+            } for topic in topics])
+
+    class UserCodingQuestions(Resource):
+        def get(self):
+            """Get coding questions for a specific topic"""
+            topic_id = request.args.get('topic_id', type=int)
+            
+            if not topic_id:
+                return {'error': 'topic_id parameter is required'}, 400
+
+            # Verify topic exists
+            topic = Topic.query.get(topic_id)
+            if not topic:
+                return {'error': 'Topic not found'}, 404
+
+            questions = CodingQuestion.query.filter_by(topic_id=topic_id).options(
+                joinedload(CodingQuestion.test_cases)
+            ).all()
+
+            return jsonify({
+                'questions': [{
+                    'id': q.id,
+                    'title': q.title,
+                    'description': q.description,
+                    'function_signature': q.function_signature,
+                    'constraints': q.constraints,
+                    'difficulty': q.difficulty,
+                    'topic_id': q.topic_id,
+                    'test_cases': [{
+                        'id': tc.id,
+                        'input_data': tc.input_data,
+                        'expected_output': tc.expected_output,
+                        'is_sample': tc.is_sample
+                    } for tc in q.test_cases if tc.is_sample]  # Only return sample test cases to users
+                } for q in questions]
+            })
+
+    class UserCodingQuestion(Resource):
+        def get(self, question_id):
+            """Get a specific coding question with sample test cases"""
+            question = CodingQuestion.query.options(
+                joinedload(CodingQuestion.topic),
+                joinedload(CodingQuestion.test_cases)
+            ).get(question_id)
+
+            if not question:
+                return {'error': 'Coding question not found'}, 404
+
+            # Only return sample test cases to users
+            sample_test_cases = [tc for tc in question.test_cases if tc.is_sample]
+
+            return {
+                'id': question.id,
+                'title': question.title,
+                'description': question.description,
+                'function_signature': question.function_signature,
+                'constraints': question.constraints,
+                'difficulty': question.difficulty,
+                'topic_id': question.topic_id,
+                'topic_name': question.topic.name,
+                'test_cases': [{
+                    'id': tc.id,
+                    'input_data': tc.input_data,
+                    'expected_output': tc.expected_output,
+                    'is_sample': tc.is_sample
+                } for tc in sample_test_cases]
+            }
+
+    # Register coding routes
+    api.add_resource(UserCodingTopics, '/coding/topics')
+    api.add_resource(UserCodingQuestions, '/coding/questions')
+    api.add_resource(UserCodingQuestion, '/coding/questions/<int:question_id>')

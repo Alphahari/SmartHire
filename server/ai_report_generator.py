@@ -8,7 +8,7 @@ from models import QuizAttempt, Score, Quiz, Chapter
 class AIReportGenerator:
     def __init__(self):
         self.llm = ChatGroq(
-            model="llama-3.1-70b-versatile",
+            model="llama-3.1-8b-instant",
             groq_api_key=os.getenv('GROQ_API_KEY'),
             temperature=0.7
         )

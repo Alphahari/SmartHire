@@ -16,7 +16,6 @@ export default function UserDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('subjects');
   const { data: session } = useSession();
-
   useEffect(() => {
     async function getSubjects() {
       try {     
