@@ -35,6 +35,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'max_overflow': 10,
     'pool_timeout': 30,
     'pool_recycle': 1800,
+    'pool_pre_ping': True,
 }
 
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6380')
@@ -134,7 +135,7 @@ def update_reminder_time():
         return jsonify({"error": "Invalid time format. Use HH:MM"}), 400
 
 @app.route('/test-monthly-report-email')
-@limiter.limit("1 per 1 minute") 
+# @limiter.limit("1 per 1 minute") 
 def trigger_report_email_task():
     try:
         celery.send_task('celery_worker.send_ai_enhanced_monthly_reports')
@@ -204,13 +205,20 @@ def generate_ai_report():
         last_day_prev = first_day_current - timedelta(days=1)
         first_day_prev = last_day_prev.replace(day=1)
         
-        # Get performance data
+        # Get comprehensive performance data
         performance_data = ai_report_generator.get_user_performance_data(
             user.id, first_day_prev, first_day_current
         )
         
-        if not performance_data['quiz_performance']:
-            return jsonify({"error": "No quiz data available for analysis"}), 400
+        # Check if any data is available (quizzes, coding, or interviews)
+        has_data = (
+            performance_data['quiz_performance'] or 
+            performance_data['coding_performance'] or 
+            performance_data['interview_performance']
+        )
+        
+        if not has_data:
+            return jsonify({"error": "No performance data available for analysis this month"}), 400
         
         # Generate AI report
         ai_report = ai_report_generator.generate_insightful_report(
@@ -223,10 +231,21 @@ def generate_ai_report():
             "message": "AI report generated successfully",
             "report": ai_report,
             "performance_summary": {
-                "total_quizzes": performance_data['total_quizzes'],
-                "overall_accuracy": performance_data['overall_accuracy'],
-                "total_questions": performance_data['total_questions'],
-                "total_correct": performance_data['total_correct']
+                "quiz_performance": {
+                    "total_quizzes": performance_data['total_quizzes'],
+                    "overall_accuracy": performance_data['overall_accuracy'],
+                    "total_questions": performance_data['total_questions'],
+                    "total_correct": performance_data['total_correct']
+                },
+                "coding_performance": {
+                    "total_submissions": performance_data['total_coding_submissions'],
+                    "accepted_submissions": performance_data['accepted_coding_submissions'],
+                    "acceptance_rate": performance_data['coding_acceptance_rate']
+                },
+                "interview_performance": {
+                    "total_interviews": performance_data['total_interviews'],
+                    "average_score": performance_data['avg_interview_score']
+                }
             },
             "month": first_day_prev.strftime("%B %Y")
         }), 200

@@ -118,3 +118,23 @@ export async function fetchQuizDuration(quizId: number) {
     return 60; // fallback duration
   }
 }
+
+export async function fetchAllQuizzes() {
+  try {
+    const response = await fetch(`http://localhost:5000/api/admin/quizzes`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch quizzes: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching quizzes:', error);
+    throw new Error('Failed to fetch quizzes');
+  }
+}

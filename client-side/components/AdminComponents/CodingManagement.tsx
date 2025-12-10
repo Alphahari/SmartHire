@@ -42,8 +42,9 @@ const CodingManagement = ({ onCodingChange }: CodingManagementProps) => {
   const [newQuestion, setNewQuestion] = useState({
     title: '',
     description: '',
-    function_signature: '',
     constraints: '',
+    input_format: '',
+    output_format: '',
     difficulty: 'medium',
     topic_id: 0
   });
@@ -206,8 +207,9 @@ const CodingManagement = ({ onCodingChange }: CodingManagementProps) => {
         setNewQuestion({
           title: '',
           description: '',
-          function_signature: '',
           constraints: '',
+          input_format: '',
+          output_format: '',
           difficulty: 'medium',
           topic_id: 0
         });
@@ -229,8 +231,9 @@ const CodingManagement = ({ onCodingChange }: CodingManagementProps) => {
       const updatedQuestion = await updateCodingQuestion(question.id.toString(), {
         title: question.title,
         description: question.description,
-        function_signature: question.function_signature,
         constraints: question.constraints || '',
+        input_format: question.input_format || '',
+        output_format: question.output_format || '',
         difficulty: question.difficulty,
         topic_id: question.topic_id
       });
@@ -449,7 +452,7 @@ const CodingManagement = ({ onCodingChange }: CodingManagementProps) => {
                     value={newTestCase.input_data}
                     onChange={(e) => setNewTestCase({ ...newTestCase, input_data: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter input data (e.g., [1,2,3])"
+                    placeholder="Enter input data (e.g., 5\n1 2 3 4 5)"
                     rows={3}
                   />
                 </div>
@@ -459,7 +462,7 @@ const CodingManagement = ({ onCodingChange }: CodingManagementProps) => {
                     value={newTestCase.expected_output}
                     onChange={(e) => setNewTestCase({ ...newTestCase, expected_output: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter expected output"
+                    placeholder="Enter expected output (e.g., 15)"
                     rows={3}
                   />
                 </div>
@@ -612,7 +615,7 @@ const CodingManagement = ({ onCodingChange }: CodingManagementProps) => {
                     Difficulty
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Function Signature
+                    Test Cases
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -633,8 +636,8 @@ const CodingManagement = ({ onCodingChange }: CodingManagementProps) => {
                         {question.difficulty}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 font-mono">
-                      {question.function_signature}
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {question.test_cases?.length || 0} total
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button
@@ -690,13 +693,23 @@ const CodingManagement = ({ onCodingChange }: CodingManagementProps) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Function Signature</label>
-                  <input
-                    type="text"
-                    value={newQuestion.function_signature}
-                    onChange={(e) => setNewQuestion({ ...newQuestion, function_signature: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                    placeholder="e.g., def two_sum(nums: List[int], target: int) -> List[int]:"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Input Format</label>
+                  <textarea
+                    value={newQuestion.input_format}
+                    onChange={(e) => setNewQuestion({ ...newQuestion, input_format: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                    placeholder="Describe how input should be formatted (e.g., First line: integer n, Next n lines: integers)"
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Output Format</label>
+                  <textarea
+                    value={newQuestion.output_format}
+                    onChange={(e) => setNewQuestion({ ...newQuestion, output_format: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                    placeholder="Describe expected output format (e.g., Single integer representing sum)"
+                    rows={3}
                   />
                 </div>
                 <div>
@@ -765,12 +778,21 @@ const CodingManagement = ({ onCodingChange }: CodingManagementProps) => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Function Signature</label>
-                  <input
-                    type="text"
-                    value={editingQuestion.function_signature}
-                    onChange={(e) => setEditingQuestion({ ...editingQuestion, function_signature: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Input Format</label>
+                  <textarea
+                    value={editingQuestion.input_format || ''}
+                    onChange={(e) => setEditingQuestion({ ...editingQuestion, input_format: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Output Format</label>
+                  <textarea
+                    value={editingQuestion.output_format || ''}
+                    onChange={(e) => setEditingQuestion({ ...editingQuestion, output_format: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                    rows={3}
                   />
                 </div>
                 <div>

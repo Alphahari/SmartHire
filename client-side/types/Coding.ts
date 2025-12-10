@@ -10,8 +10,9 @@ export interface CodingQuestion {
   id: number;
   title: string;
   description: string;
-  function_signature: string;
   constraints?: string;
+  input_format?: string;
+  output_format?: string;
   difficulty: string;
   topic_id: number;
   topic_name?: string;

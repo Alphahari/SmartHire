@@ -1,9 +1,16 @@
-import { createClient } from 'redis';
+import { createClient } from "redis";
 
-export const client = createClient();
-export const pubSubClient = createClient();
+// IMPORTANT: specify the correct port
+export const client = createClient({
+    url: "redis://localhost:6380"
+});
 
-client.on('error', err => console.log('Redis Client Error', err));
+export const pubSubClient = createClient({
+    url: "redis://localhost:6380"
+});
+
+client.on("error", err => console.error("Redis Client Error", err));
+pubSubClient.on("error", err => console.error("Redis PubSub Error", err));
 
 (async () => {
     await client.connect();

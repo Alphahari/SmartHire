@@ -22,6 +22,7 @@ class User(db.Model, UserMixin):
     role = db.Column(db.Enum(Role), default=Role.USER, nullable=False)
     reminder_time = db.Column(db.Time, nullable=True)
     scores = db.relationship('Score', backref='user', cascade='all, delete-orphan', passive_deletes=True)
+    interviews = db.relationship('InterviewSession', backref='user', cascade='all, delete-orphan', passive_deletes=True)
 
 class Subject(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -118,9 +119,11 @@ class CodingQuestion(db.Model):
 
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
-    function_signature = db.Column(db.String(300), nullable=False)
+    # Removed function_signature column
     constraints = db.Column(db.Text)
     difficulty = db.Column(db.String(20), default="medium")  # easy/medium/hard
+    input_format = db.Column(db.Text, nullable=True)  # Added: describes how input should be formatted
+    output_format = db.Column(db.Text, nullable=True)  # Added: describes expected output format
 
     test_cases = db.relationship(
         'TestCase',
@@ -172,8 +175,6 @@ class Submission(db.Model):
     status = db.Column(db.String(20))    # Accepted, Wrong Answer, Runtime Error
     total_testcases = db.Column(db.Integer)
     passed_testcases = db.Column(db.Integer)
-    time_taken = db.Column(db.Float)
-    memory_used = db.Column(db.Float)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
     results = db.relationship(
@@ -203,3 +204,56 @@ class TestCaseResult(db.Model):
     actual_output = db.Column(db.Text)
     error_message = db.Column(db.Text)
     time_taken = db.Column(db.Float)
+
+
+# --- NEW MODEL FOR INTERVIEW SESSIONS ---
+class InterviewSession(db.Model):
+    __tablename__ = 'interview_session'
+    
+    # primary_key=True automatically implies autoincrement=True for Integers in SQLAlchemy
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True) 
+    
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Data fields
+    total_questions = db.Column(db.Integer, default=0)
+    final_score = db.Column(db.Float, nullable=False)
+    summary = db.Column(db.Text, nullable=True)
+    strengths = db.Column(db.Text, nullable=True)
+    weaknesses = db.Column(db.Text, nullable=True)
+    suggestions = db.Column(db.Text, nullable=True)
+
+class MockTest(db.Model):
+    __tablename__ = 'mock_tests'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    quiz_id = db.Column(db.Integer, db.ForeignKey('quiz.id'), nullable=False)
+    coding_question_id = db.Column(db.Integer, db.ForeignKey('coding_question.id'), nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    quiz = db.relationship('Quiz', backref='mock_tests')
+    coding_question = db.relationship('CodingQuestion', backref='mock_tests')
+    
+class MockTestAttempt(db.Model):
+    __tablename__ = 'mock_test_attempts'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    mock_test_id = db.Column(db.Integer, db.ForeignKey('mock_tests.id'), nullable=False)
+    quiz_score = db.Column(db.Float)
+    coding_score = db.Column(db.Float)
+    total_score = db.Column(db.Float)
+    time_spent = db.Column(db.Integer)  # in seconds
+    status = db.Column(db.String(20), default='in_progress')  # in_progress, completed
+    started_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime)
+    
+    # Relationships
+    user = db.relationship('User', backref='mock_test_attempts')
+    mock_test = db.relationship('MockTest', backref='attempts')

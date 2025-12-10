@@ -79,8 +79,9 @@ export const fetchCodingQuestionsByTopic = async (topicId: number): Promise<Codi
 export const addCodingQuestion = async (data: {
   title: string;
   description: string;
-  function_signature: string;
   constraints: string;
+  input_format: string;
+  output_format: string;
   difficulty: string;
   topic_id: number;
 }): Promise<CodingQuestion> => {
@@ -103,8 +104,9 @@ export const addCodingQuestion = async (data: {
 export const updateCodingQuestion = async (id: string, data: {
   title: string;
   description: string;
-  function_signature: string;
   constraints: string;
+  input_format: string;
+  output_format: string;
   difficulty: string;
   topic_id: number;
 }): Promise<CodingQuestion> => {
@@ -203,3 +205,16 @@ export const deleteTestCase = async (id: string): Promise<boolean> => {
   
   return true;
 };
+
+export async function fetchAllCodingQuestions(page = 1, perPage = 100): Promise<{
+  questions: CodingQuestion[];
+  total: number;
+  pages: number;
+  current_page: number;
+}> {
+  const response = await fetch(`${API_BASE_URL}/admin/coding/questions?page=${page}&per_page=${perPage}`, {
+    credentials: 'include'
+  });
+  if (!response.ok) throw new Error('Failed to fetch all coding questions');
+  return response.json();
+}

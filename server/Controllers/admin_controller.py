@@ -1,6 +1,6 @@
 from flask import jsonify, request
 from flask_restful import Resource
-from models import QuizAttempt, Submission, db, User, Subject, Chapter, Quiz, Question, Score, Topic, CodingQuestion, TestCase
+from models import MockTest, QuizAttempt, Submission, db, User, Subject, Chapter, Quiz, Question, Score, Topic, CodingQuestion, TestCase
 from functools import wraps
 from datetime import datetime, timedelta
 import pytz
@@ -204,6 +204,22 @@ def register_admin_routes(api):
                 db.session.rollback()
                 return {'error': f'Failed to delete chapter: {str(e)}'}, 500
     class AdminQuizzes(Resource):
+        def get(self):
+            """Get all quizzes for admin"""
+            quizzes = Quiz.query.options(
+                joinedload(Quiz.chapter).joinedload(Chapter.subject)
+            ).all()
+            
+            return jsonify([{
+                'id': q.id,
+                'chapter_id': q.chapter_id,
+                'start_time': convert_to_ist1(q.start_time).isoformat() if q.start_time else None,
+                'end_time': convert_to_ist1(q.end_time).isoformat() if q.end_time else None,
+                'duration': q.duration,
+                'remarks': q.remarks,
+                'chapter_name': q.chapter.name if q.chapter else '',
+                'subject_name': q.chapter.subject.name if q.chapter and q.chapter.subject else ''
+            } for q in quizzes])
         # @admin_required
         def post(self):
             data = request.get_json()
@@ -851,7 +867,7 @@ def register_admin_routes(api):
                     'difficulty': q.difficulty,
                     'topic_id': q.topic_id,
                     'topic_name': q.topic.name,
-                    'function_signature': q.function_signature
+                    # Removed function_signature
                 } for q in questions.items],
                 'total': questions.total,
                 'pages': questions.pages,
@@ -862,7 +878,7 @@ def register_admin_routes(api):
             """Create a new coding question"""
             data = request.get_json()
             
-            required_fields = ['title', 'description', 'function_signature', 'topic_id']
+            required_fields = ['title', 'description', 'topic_id']
             for field in required_fields:
                 if not data.get(field):
                     return {'error': f'{field} is required'}, 400
@@ -875,8 +891,9 @@ def register_admin_routes(api):
             new_question = CodingQuestion(
                 title=data['title'],
                 description=data['description'],
-                function_signature=data['function_signature'],
                 constraints=data.get('constraints'),
+                input_format=data.get('input_format'),
+                output_format=data.get('output_format'),
                 difficulty=data.get('difficulty', 'medium'),
                 topic_id=data['topic_id']
             )
@@ -888,8 +905,9 @@ def register_admin_routes(api):
                 'id': new_question.id,
                 'title': new_question.title,
                 'description': new_question.description,
-                'function_signature': new_question.function_signature,
                 'constraints': new_question.constraints,
+                'input_format': new_question.input_format,
+                'output_format': new_question.output_format,
                 'difficulty': new_question.difficulty,
                 'topic_id': new_question.topic_id
             }, 201
@@ -909,8 +927,9 @@ def register_admin_routes(api):
                 'id': question.id,
                 'title': question.title,
                 'description': question.description,
-                'function_signature': question.function_signature,
                 'constraints': question.constraints,
+                'input_format': question.input_format,
+                'output_format': question.output_format,
                 'difficulty': question.difficulty,
                 'topic_id': question.topic_id,
                 'topic_name': question.topic.name,
@@ -931,7 +950,7 @@ def register_admin_routes(api):
             data = request.get_json()
             
             # Update fields if provided
-            fields = ['title', 'description', 'function_signature', 'constraints', 'difficulty', 'topic_id']
+            fields = ['title', 'description', 'constraints', 'input_format', 'output_format', 'difficulty', 'topic_id']
             for field in fields:
                 if field in data:
                     setattr(question, field, data[field])
@@ -1103,3 +1122,105 @@ def register_admin_routes(api):
     api.add_resource(AdminTestCases, '/admin/coding/questions/<int:question_id>/test-cases')
     api.add_resource(AdminTestCase, '/admin/coding/test-cases/<int:id>')
     api.add_resource(AdminSubmissions, '/admin/coding/submissions')
+
+    class AdminMockTests(Resource):
+        def get(self):
+            """Get all mock tests"""
+            mock_tests = MockTest.query.options(
+                joinedload(MockTest.quiz).joinedload(Quiz.chapter).joinedload(Chapter.subject),
+                joinedload(MockTest.coding_question)
+            ).all()
+            
+            return jsonify([{
+                'id': mt.id,
+                'name': mt.name,
+                'description': mt.description,
+                'quiz_id': mt.quiz_id,
+                'quiz_name': mt.quiz.remarks if mt.quiz else '',
+                'coding_question_id': mt.coding_question_id,
+                'coding_question_title': mt.coding_question.title if mt.coding_question else '',
+                'is_active': mt.is_active,
+                'created_at': mt.created_at.isoformat()
+            } for mt in mock_tests])
+
+        def post(self):
+            """Create a new mock test"""
+            data = request.get_json()
+            
+            required_fields = ['name', 'quiz_id', 'coding_question_id']
+            for field in required_fields:
+                if not data.get(field):
+                    return {'error': f'{field} is required'}, 400
+            
+            # Verify quiz exists
+            quiz = Quiz.query.get(data['quiz_id'])
+            if not quiz:
+                return {'error': 'Quiz not found'}, 404
+            
+            # Verify coding question exists
+            coding_question = CodingQuestion.query.get(data['coding_question_id'])
+            if not coding_question:
+                return {'error': 'Coding question not found'}, 404
+            
+            new_mock_test = MockTest(
+                name=data['name'],
+                description=data.get('description', ''),
+                quiz_id=data['quiz_id'],
+                coding_question_id=data['coding_question_id'],
+                is_active=data.get('is_active', True)
+            )
+            
+            db.session.add(new_mock_test)
+            db.session.commit()
+            
+            return {
+                'id': new_mock_test.id,
+                'name': new_mock_test.name,
+                'description': new_mock_test.description,
+                'quiz_id': new_mock_test.quiz_id,
+                'coding_question_id': new_mock_test.coding_question_id,
+                'is_active': new_mock_test.is_active
+            }, 201
+
+    class AdminMockTest(Resource):
+        def put(self, id):
+            """Update a mock test"""
+            mock_test = MockTest.query.get(id)
+            if not mock_test:
+                return {'error': 'Mock test not found'}, 404
+            
+            data = request.get_json()
+            
+            if 'name' in data:
+                mock_test.name = data['name']
+            if 'description' in data:
+                mock_test.description = data['description']
+            if 'quiz_id' in data:
+                quiz = Quiz.query.get(data['quiz_id'])
+                if not quiz:
+                    return {'error': 'Quiz not found'}, 404
+                mock_test.quiz_id = data['quiz_id']
+            if 'coding_question_id' in data:
+                coding_question = CodingQuestion.query.get(data['coding_question_id'])
+                if not coding_question:
+                    return {'error': 'Coding question not found'}, 404
+                mock_test.coding_question_id = data['coding_question_id']
+            if 'is_active' in data:
+                mock_test.is_active = data['is_active']
+            
+            db.session.commit()
+            return {'message': 'Mock test updated successfully'}
+
+        def delete(self, id):
+            """Delete a mock test"""
+            mock_test = MockTest.query.get(id)
+            if not mock_test:
+                return {'error': 'Mock test not found'}, 404
+            
+            db.session.delete(mock_test)
+            db.session.commit()
+            return {'message': 'Mock test deleted successfully'}, 200
+
+    # Add to register_admin_routes function:
+    api.add_resource(AdminMockTests, '/admin/mock-tests')
+    api.add_resource(AdminMockTest, '/admin/mock-tests/<int:id>')

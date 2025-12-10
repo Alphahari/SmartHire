@@ -1,7 +1,7 @@
 from flask_restful import Resource
 from flask import request, jsonify
 from datetime import datetime
-from models import db, Quiz, QuizAttempt, Score, Question, QuizAttempt, Score, Quiz, Chapter 
+from models import User, db, Quiz, QuizAttempt, Score, Question, QuizAttempt, Score, Quiz, Chapter 
 import pytz
 # from extensions import cache
 from sqlalchemy.orm import joinedload
@@ -111,15 +111,18 @@ class StartQuiz(Resource):
 
         quiz = Quiz.query.get_or_404(quiz_id)
         
-        # Check if current time is within quiz availability window
-        current_time = datetime.utcnow()
+        # --- FIX: Make current_time timezone-aware (UTC) ---
+        # This prevents the "can't compare offset-naive and offset-aware" error
+        current_time = datetime.now(pytz.utc)
+        
         if current_time < quiz.start_time:
             return {'error': 'Quiz has not started yet'}, 400
             
         if current_time > quiz.end_time:
             return {'error': 'Quiz has ended'}, 400
+        # ---------------------------------------------------
 
-        # Check if user has already completed this quiz
+        # Check for existing attempt
         existing_attempt = QuizAttempt.query.filter_by(
             user_id=user_id,
             quiz_id=quiz_id
@@ -128,7 +131,7 @@ class StartQuiz(Resource):
         if existing_attempt and existing_attempt.end_time is not None:
             return {'error': 'Quiz already attempted'}, 400
         
-        # If there's an existing attempt but not completed, return it
+        # If there's an existing in-progress attempt, return it
         if existing_attempt:
             return {
                 'attempt_id': existing_attempt.id,
@@ -139,7 +142,7 @@ class StartQuiz(Resource):
         attempt = QuizAttempt(
             user_id=user_id,
             quiz_id=quiz_id,
-            start_time=datetime.utcnow()
+            start_time=datetime.utcnow() # Database expects naive UTC here (if column is standard DateTime)
         )
         db.session.add(attempt)
         db.session.commit()
@@ -154,38 +157,128 @@ class SubmitQuiz(Resource):
         data = request.get_json()
         user_id = data.get('user_id')
         
+        print(f"=== DEBUG SUBMIT QUIZ ===")
+        print(f"User ID: {user_id}, Quiz ID: {quiz_id}")
+        print(f"Request data: {data}")
+        
         if not user_id:
             return {'error': 'User ID is required'}, 400
 
-        # Check for existing attempt (both completed and in-progress)
+        # Check for existing attempt
         attempt = QuizAttempt.query.filter_by(
-            user_id=user_id,
+            user_id=int(user_id),
             quiz_id=quiz_id
         ).first()
         
-        print(f"SubmitQuiz: Looking for attempt for user {user_id} on quiz {quiz_id}")
-        print(f"SubmitQuiz: Found attempt: {attempt}")
+        print(f"DEBUG: Found attempt: {attempt}")
+        if attempt:
+            print(f"DEBUG: Attempt ID: {attempt.id}")
+            print(f"DEBUG: Attempt user_id: {attempt.user_id}")
+            print(f"DEBUG: Attempt quiz_id: {attempt.quiz_id}")
+            print(f"DEBUG: Attempt start_time: {attempt.start_time}")
+            print(f"DEBUG: Attempt end_time: {attempt.end_time}")
+
+        # Get quiz details
+        quiz = Quiz.query.get(quiz_id)
+        if not quiz:
+            print(f"DEBUG: Quiz {quiz_id} not found in database!")
+            return {'error': 'Quiz not found'}, 404
         
-        if not attempt:
-            return {'error': 'No quiz attempt found'}, 400
+        print(f"DEBUG: Quiz found: ID={quiz.id}, Chapter={quiz.chapter_id}")
+        print(f"DEBUG: Quiz start_time: {quiz.start_time} (type: {type(quiz.start_time)})")
+        print(f"DEBUG: Quiz end_time: {quiz.end_time} (type: {type(quiz.end_time)})")
+        print(f"DEBUG: Quiz duration: {quiz.duration} minutes")
+
+        # Check if quiz exists in the chapter
+        chapter = Chapter.query.get(quiz.chapter_id)
+        if chapter:
+            print(f"DEBUG: Chapter found: {chapter.name}")
+        else:
+            print(f"DEBUG: Chapter {quiz.chapter_id} not found!")
+
+        # Get current time with proper timezone handling
+        current_time_utc = datetime.utcnow()
+        current_time_aware = datetime.now(pytz.utc)
+        
+        print(f"DEBUG: Current time (UTC naive): {current_time_utc}")
+        print(f"DEBUG: Current time (UTC aware): {current_time_aware}")
+        
+        # Check if quiz times are timezone-aware or naive
+        if quiz.start_time:
+            if quiz.start_time.tzinfo is None:
+                print(f"DEBUG: Quiz start_time is NAIVE (no timezone)")
+                # Convert to timezone-aware UTC for comparison
+                quiz_start_aware = pytz.utc.localize(quiz.start_time)
+            else:
+                print(f"DEBUG: Quiz start_time is AWARE, timezone: {quiz.start_time.tzinfo}")
+                quiz_start_aware = quiz.start_time.astimezone(pytz.utc)
             
-        if attempt.end_time is not None:
+            print(f"DEBUG: Quiz start_time (aware UTC): {quiz_start_aware}")
+            print(f"DEBUG: Current time < Quiz start_time? {current_time_aware < quiz_start_aware}")
+        
+        if quiz.end_time:
+            if quiz.end_time.tzinfo is None:
+                print(f"DEBUG: Quiz end_time is NAIVE (no timezone)")
+                # Convert to timezone-aware UTC for comparison
+                quiz_end_aware = pytz.utc.localize(quiz.end_time)
+            else:
+                print(f"DEBUG: Quiz end_time is AWARE, timezone: {quiz.end_time.tzinfo}")
+                quiz_end_aware = quiz.end_time.astimezone(pytz.utc)
+            
+            print(f"DEBUG: Quiz end_time (aware UTC): {quiz_end_aware}")
+            print(f"DEBUG: Current time > Quiz end_time? {current_time_aware > quiz_end_aware}")
+
+        if not attempt:
+            print("DEBUG: No existing attempt found, checking if we should create one...")
+            
+            # Time validation
+            quiz_start_aware = pytz.utc.localize(quiz.start_time) if quiz.start_time.tzinfo is None else quiz.start_time.astimezone(pytz.utc)
+            quiz_end_aware = pytz.utc.localize(quiz.end_time) if quiz.end_time.tzinfo is None else quiz.end_time.astimezone(pytz.utc)
+            
+            if current_time_aware < quiz_start_aware:
+                print(f"DEBUG: Quiz has not started yet! Current: {current_time_aware}, Start: {quiz_start_aware}")
+                return {'error': 'Quiz has not started yet'}, 400
+                
+            if current_time_aware > quiz_end_aware:
+                print(f"DEBUG: Quiz has ended! Current: {current_time_aware}, End: {quiz_end_aware}")
+                return {'error': 'Quiz has ended'}, 400
+            
+            # Create a new attempt
+            print("DEBUG: Creating new quiz attempt...")
+            attempt = QuizAttempt(
+                user_id=int(user_id),
+                quiz_id=quiz_id,
+                start_time=current_time_utc  # Use naive UTC for database
+            )
+            db.session.add(attempt)
+            db.session.flush()
+            print(f"DEBUG: Created new attempt with ID: {attempt.id}")
+            
+        elif attempt.end_time is not None:
+            print(f"DEBUG: Attempt already submitted at {attempt.end_time}")
             return {'error': 'Quiz already submitted'}, 400
 
         # Calculate time spent
-        quiz = Quiz.query.get_or_404(quiz_id)
-        time_spent = (quiz.duration * 60) - data.get('time_remaining', 0)
+        time_remaining = data.get('time_remaining', 0)
+        time_spent = (quiz.duration * 60) - time_remaining
+        print(f"DEBUG: Time remaining: {time_remaining}s, Time spent: {time_spent}s")
 
         # Update attempt
-        attempt.end_time = datetime.utcnow()
+        attempt.end_time = current_time_utc
         attempt.time_spent = time_spent
         
         # Get all questions for this quiz
         questions = Question.query.filter_by(quiz_id=quiz_id).all()
+        print(f"DEBUG: Found {len(questions)} questions for quiz {quiz_id}")
         
         # Create score records for all questions
+        answers = data.get('answers', {})
+        print(f"DEBUG: Answers received: {answers}")
+        
         for question in questions:
-            selected_option = data.get('answers', {}).get(str(question.id))
+            selected_option = answers.get(str(question.id))
+            print(f"DEBUG: Question {question.id}: selected_option={selected_option}")
+            
             score = Score(
                 user_id=int(user_id),
                 quiz_id=quiz_id,
@@ -195,9 +288,19 @@ class SubmitQuiz(Resource):
             )
             db.session.add(score)
 
-        db.session.commit()
-        print(f"SubmitQuiz: Successfully submitted quiz {quiz_id} for user {user_id}")
-        return {'message': 'Quiz submitted successfully'}, 200    
+        try:
+            db.session.commit()
+            print(f"DEBUG: Successfully submitted quiz {quiz_id} for user {user_id}")
+            print(f"=== END DEBUG ===")
+            return {
+                'message': 'Quiz submitted successfully',
+                'attempt_id': attempt.id
+            }, 200
+        except Exception as e:
+            db.session.rollback()
+            print(f"DEBUG: Error committing to database: {str(e)}")
+            print(f"=== END DEBUG ===")
+            return {'error': f'Database error: {str(e)}'}, 500
 
 class QuizAttemptStatus(Resource):
     def post(self):  # Change from get to post
@@ -270,7 +373,96 @@ class UserQuizAttempts(Resource):
             })
 
         return jsonify(results)
-
+class DebugQuizState(Resource):
+    def post(self):
+        """Debug endpoint to check quiz state"""
+        data = request.get_json()
+        user_id = data.get('user_id')
+        quiz_id = data.get('quiz_id')
+        
+        if not user_id or not quiz_id:
+            return {'error': 'User ID and Quiz ID required'}, 400
+        
+        print(f"=== DEBUG QUIZ STATE ===")
+        
+        # Check user
+        user = User.query.get(user_id)
+        print(f"User: {user}")
+        
+        # Check quiz
+        quiz = Quiz.query.get(quiz_id)
+        print(f"Quiz: {quiz}")
+        
+        if quiz:
+            print(f"Quiz details:")
+            print(f"  ID: {quiz.id}")
+            print(f"  Chapter ID: {quiz.chapter_id}")
+            print(f"  Start time: {quiz.start_time} (type: {type(quiz.start_time)})")
+            print(f"  End time: {quiz.end_time} (type: {type(quiz.end_time)})")
+            print(f"  Duration: {quiz.duration} minutes")
+            
+            # Check chapter
+            chapter = Chapter.query.get(quiz.chapter_id)
+            if chapter:
+                print(f"  Chapter: {chapter.name}")
+        
+        # Check attempts
+        attempts = QuizAttempt.query.filter_by(
+            user_id=int(user_id),
+            quiz_id=quiz_id
+        ).all()
+        
+        print(f"Found {len(attempts)} attempts:")
+        for attempt in attempts:
+            print(f"  Attempt ID: {attempt.id}")
+            print(f"    Start: {attempt.start_time}")
+            print(f"    End: {attempt.end_time}")
+            print(f"    Time spent: {attempt.time_spent}")
+        
+        # Check questions
+        questions = Question.query.filter_by(quiz_id=quiz_id).all()
+        print(f"Found {len(questions)} questions for this quiz")
+        
+        # Current time
+        current_utc = datetime.utcnow()
+        current_aware = datetime.now(pytz.utc)
+        print(f"Current time (UTC naive): {current_utc}")
+        print(f"Current time (UTC aware): {current_aware}")
+        
+        # Time validation if quiz exists
+        if quiz:
+            quiz_start = quiz.start_time
+            quiz_end = quiz.end_time
+            
+            if quiz_start and quiz_end:
+                # Make both timezone aware for comparison
+                if quiz_start.tzinfo is None:
+                    quiz_start_aware = pytz.utc.localize(quiz_start)
+                else:
+                    quiz_start_aware = quiz_start.astimezone(pytz.utc)
+                    
+                if quiz_end.tzinfo is None:
+                    quiz_end_aware = pytz.utc.localize(quiz_end)
+                else:
+                    quiz_end_aware = quiz_end.astimezone(pytz.utc)
+                
+                print(f"Quiz start (aware): {quiz_start_aware}")
+                print(f"Quiz end (aware): {quiz_end_aware}")
+                print(f"Is current time < quiz start? {current_aware < quiz_start_aware}")
+                print(f"Is current time > quiz end? {current_aware > quiz_end_aware}")
+                print(f"Is current time within quiz window? {quiz_start_aware <= current_aware <= quiz_end_aware}")
+        
+        print(f"=== END DEBUG ===")
+        
+        return {
+            'user_exists': user is not None,
+            'quiz_exists': quiz is not None,
+            'attempts_count': len(attempts),
+            'questions_count': len(questions),
+            'current_time_utc': current_utc.isoformat(),
+            'quiz_start': quiz.start_time.isoformat() if quiz else None,
+            'quiz_end': quiz.end_time.isoformat() if quiz else None
+        }, 200
 
 def register_quiz_routes(api):
     api.add_resource(StartQuiz, '/quizzes/<int:quiz_id>/start')
@@ -279,3 +471,4 @@ def register_quiz_routes(api):
     api.add_resource(QuizResults, '/quiz_attempts/<int:attempt_id>/results')
     api.add_resource(GetAttemptByQuiz, '/quizzes/attempt')
     api.add_resource(UserQuizAttempts, '/user/quiz_attempts')
+    api.add_resource(DebugQuizState, '/debug/quiz-state')  # Add this line

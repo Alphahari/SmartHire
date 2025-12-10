@@ -1,3 +1,5 @@
+// [file name]: CodingProblemDisplay.tsx
+// [file content begin]
 import { CodingQuestion } from '@/types/Coding';
 
 interface CodingProblemDisplayProps {
@@ -35,10 +37,48 @@ export default function CodingProblemDisplay({ question }: CodingProblemDisplayP
         </div>
       )}
 
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">Function Signature</h3>
-        <div className="bg-gray-900 text-green-400 rounded-lg p-4 font-mono text-sm">
-          {question.function_signature}
+      {/* Removed Function Signature Section */}
+      
+      {/* Custom Test Cases Format Instructions */}
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">Test Case Format</h3>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="text-sm text-gray-700 space-y-2">
+            <p className="font-medium text-blue-800 mb-2">For each test case, provide input in the following format:</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="font-medium text-gray-800 mb-1">Input Format:</h4>
+                <pre className="text-sm bg-white p-3 rounded border overflow-x-auto">
+{`Multiple lines as needed:
+first_input_value
+second_input_value
+...
+
+Example:
+5
+1 2 3 4 5`}</pre>
+              </div>
+              <div>
+                <h4 className="font-medium text-gray-800 mb-1">Output Format:</h4>
+                <pre className="text-sm bg-white p-3 rounded border overflow-x-auto">
+{`Expected output for given input
+
+Example:
+15`}</pre>
+              </div>
+            </div>
+            
+            <div className="mt-3 pt-3 border-t border-blue-200">
+              <h4 className="font-medium text-gray-800 mb-1">Tips:</h4>
+              <ul className="list-disc list-inside text-gray-600 space-y-1">
+                <li>Input should be provided line by line as it would be read by standard input</li>
+                <li>For array inputs, provide each element space-separated on a single line</li>
+                <li>Ensure exact formatting matches expected input parsing</li>
+                <li>Output should be exactly as expected (including whitespace)</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -72,3 +112,4 @@ export default function CodingProblemDisplay({ question }: CodingProblemDisplayP
     </div>
   );
 }
+// [file content end]

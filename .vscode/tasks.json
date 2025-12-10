@@ -1,0 +1,57 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "backend-flask",
+      "type": "shell",
+      "command": "cd server && source venv/bin/activate && flask run",
+      "problemMatcher": []
+    },
+    {
+      "label": "go-server",
+      "type": "shell",
+      "command": "cd ProctorX-executor && go run .",
+      "problemMatcher": []
+    },
+    {
+      "label": "frontend-next",
+      "type": "shell",
+      "command": "cd client-side && npm run dev",
+      "problemMatcher": []
+    },
+    {
+      "label": "celery-worker",
+      "type": "shell",
+      "command": "cd server && source venv/bin/activate && celery -A celery_worker.celery worker --loglevel=info",
+      "problemMatcher": []
+    },
+    {
+      "label": "docker-compose",
+      "type": "shell",
+      "command": "cd server && docker compose up -d",
+      "problemMatcher": []
+    },
+
+    // --- New meta task #1 ---
+    {
+      "label": "start-services",
+      "dependsOn": [
+        "backend-flask",
+        "go-server",
+        "frontend-next",
+        "celery-worker"
+      ],
+      "dependsOrder": "parallel"
+    },
+
+    // --- New meta task #2 (main entry point) ---
+    {
+      "label": "start-all",
+      "dependsOn": [
+        "docker-compose",    // Runs first
+        "start-services"     // Runs after docker-compose
+      ],
+      "dependsOrder": "sequence"
+    }
+  ]
+}

@@ -12,6 +12,7 @@ import SubjectManagement from '@/components/Subject/SubjectManagement';
 import CodingManagement from '@/components/AdminComponents/CodingManagement'; // Import the new component
 import UserManagement from '@/components/AdminComponents/UserManagement';
 import AdminAnalytics from '@/components/AdminComponents/AdminAnalytics';
+import HiringProcessManagement from '@/components/AdminComponents/HiringProcessManagement';
 
 export default function AdminDashboard() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -49,15 +50,17 @@ export default function AdminDashboard() {
         return <StatsOverview subjects={subjects} />;
       case 'subjects':
         return (
-          <SubjectManagement 
-            subjects={subjects} 
-            loading={loading} 
-            error={error} 
+          <SubjectManagement
+            subjects={subjects}
+            loading={loading}
+            error={error}
             onSubjectChange={getSubjects}
           />
         );
       case 'coding':
-        return <CodingManagement onCodingChange={getSubjects} />; // New coding tab
+        return <CodingManagement onCodingChange={getSubjects} />;
+      case 'hiring-process':  // New case
+        return <HiringProcessManagement />;
       case 'users':
         return <UserManagement onUserChange={getSubjects} />;
       case 'analytics':
@@ -71,12 +74,12 @@ export default function AdminDashboard() {
     <AdminProtectedRoute>
       <div className="flex min-h-screen bg-gray-50">
         <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-        
+
         <div className="flex-1 p-6 ml-64">
           <div className="max-w-7xl mx-auto">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
             <p className="text-gray-600 mb-8">Manage your platform efficiently</p>
-            
+
             {renderContent()}
           </div>
         </div>

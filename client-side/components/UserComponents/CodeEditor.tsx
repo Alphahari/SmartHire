@@ -1,3 +1,5 @@
+// [file name]: CodeEditor.tsx
+// [file content begin]
 'use client';
 import { useState, useEffect } from 'react';
 import { CodingQuestion } from '@/types/Coding';
@@ -20,28 +22,51 @@ interface TestCaseResult {
 }
 
 const boilerPlate = {
-  java: `public class Main {
+  java: `import java.util.*;
+
+public class Main {
     public static void main(String[] args) {
-        System.out.println("Hello, Java!");
+        Scanner scanner = new Scanner(System.in);
+        
+        // Read input here
+        // Example: int n = scanner.nextInt();
+        // Write your solution here
+        
+        scanner.close();
     }
 }`,
   c: `#include <stdio.h>
 
 int main() {
-    printf("Hello, C!\\n");
+    // Read input here
+    // Example: int n;
+    // scanf("%d", &n);
+    // Write your solution here
+    
     return 0;
 }`,
-  py: `def main():
-    print("Hello, Python!")
+  py: `import sys
 
-if __name__ == '__main__':
+def main():
+    # Read input here
+    # Example: n = int(sys.stdin.readline())
+    # Write your solution here
+    pass
+
+if __name__ == "__main__":
     main()`,
   cpp: `#include <iostream>
+#include <vector>
+#include <string>
 
 using namespace std;
 
 int main() {
-    cout << "Hello, C++!" << endl;
+    // Read input here
+    // Example: int n;
+    // cin >> n;
+    // Write your solution here
+    
     return 0;
 }`,
 };
@@ -54,10 +79,10 @@ export default function CodeEditor({ question }: CodeEditorProps) {
   const [selectedTestCase, setSelectedTestCase] = useState<number | null>(null);
   const [customTestCases, setCustomTestCases] = useState<{ input: string; expected_output: string }[]>([]);
 
-  // Initialize code based on function signature when question changes
+  // Initialize code based on language when question changes
   useEffect(() => {
-    const initialCode = generateInitialCode(language, question.function_signature);
-    setCode(initialCode);
+    setCode(boilerPlate[language]);
+    
     // Initialize with sample test cases
     if (question.test_cases) {
       const sampleCases = question.test_cases
@@ -73,26 +98,10 @@ export default function CodeEditor({ question }: CodeEditorProps) {
     setResults([]);
   }, [question, language]);
 
-  const generateInitialCode = (lang: string, functionSignature: string) => {
-    switch (lang) {
-      case 'py':
-        return `${functionSignature}\n    # Your code here\n    pass\n\n# Test the function\nif __name__ == "__main__":\n    # Add your test cases here\n    pass`;
-      case 'java':
-        return `public class Solution {\n    ${functionSignature}\n        // Your code here\n    }\n}`;
-      case 'cpp':
-        return `#include <iostream>\nusing namespace std;\n\n${functionSignature}\n    // Your code here\n}\n\nint main() {\n    // Add your test cases here\n    return 0;\n}`;
-      case 'c':
-        return `#include <stdio.h>\n\n${functionSignature}\n    // Your code here\n}\n\nint main() {\n    // Add your test cases here\n    return 0;\n}`;
-      default:
-        return boilerPlate[language];
-    }
-  };
-
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newLang = e.target.value as 'py' | 'java' | 'cpp' | 'c';
     setLanguage(newLang);
-    const newCode = generateInitialCode(newLang, question.function_signature);
-    setCode(newCode);
+    setCode(boilerPlate[newLang]);
   };
 
   const addTestCase = () => {
@@ -100,7 +109,9 @@ export default function CodeEditor({ question }: CodeEditorProps) {
   };
 
   const removeTestCase = (index: number) => {
-    setCustomTestCases(customTestCases.filter((_, i) => i !== index));
+    if (customTestCases.length > 1) {
+      setCustomTestCases(customTestCases.filter((_, i) => i !== index));
+    }
   };
 
   const updateTestCase = (index: number, field: 'input' | 'expected_output', value: string) => {
@@ -140,19 +151,32 @@ export default function CodeEditor({ question }: CodeEditorProps) {
     }
   };
 
+  const handleClearTestCases = () => {
+    setCustomTestCases([{ input: '', expected_output: '' }]);
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-4">
-        <select
-          value={language}
-          onChange={handleLanguageChange}
-          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="c">C</option>
-          <option value="cpp">C++</option>
-          <option value="java">Java</option>
-          <option value="py">Python</option>
-        </select>
+        <div className="flex items-center space-x-4">
+          <select
+            value={language}
+            onChange={handleLanguageChange}
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="c">C</option>
+            <option value="cpp">C++</option>
+            <option value="java">Java</option>
+            <option value="py">Python</option>
+          </select>
+          
+          <button
+            onClick={handleClearTestCases}
+            className="px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+          >
+            Clear Test Cases
+          </button>
+        </div>
 
         <button
           onClick={handleRunCode}
@@ -188,49 +212,86 @@ export default function CodeEditor({ question }: CodeEditorProps) {
       {/* Custom Test Cases */}
       <div className="mb-6">
         <div className="flex justify-between items-center mb-3">
-          <h3 className="text-lg font-semibold text-gray-800">Custom Test Cases</h3>
-          <button
-            onClick={addTestCase}
-            className="px-3 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
-          >
-            + Add Test Case
-          </button>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800">Custom Test Cases</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Add test cases below. Input should match how it would be read from standard input.
+            </p>
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => {
+                // Add a template test case
+                setCustomTestCases([
+                  ...customTestCases,
+                  { 
+                    input: '5\n1 2 3 4 5', 
+                    expected_output: '15' 
+                  }
+                ]);
+              }}
+              className="px-3 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+            >
+              + Template
+            </button>
+            <button
+              onClick={addTestCase}
+              className="px-3 py-1 bg-green-600 text-white rounded-md text-sm hover:bg-green-700"
+            >
+              + Add Test Case
+            </button>
+          </div>
         </div>
         
-        <div className="space-y-3">
+        <div className="space-y-4">
           {customTestCases.map((testCase, index) => (
             <div key={index} className="border border-gray-200 rounded-lg p-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="font-medium text-gray-700">Test Case {index + 1}</span>
+              <div className="flex justify-between items-center mb-3">
+                <div className="flex items-center">
+                  <div className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-full text-sm font-medium text-gray-700">
+                    {index + 1}
+                  </div>
+                  <span className="ml-2 font-medium text-gray-700">Test Case {index + 1}</span>
+                </div>
                 {customTestCases.length > 1 && (
                   <button
                     onClick={() => removeTestCase(index)}
-                    className="text-red-600 hover:text-red-800 text-sm"
+                    className="px-2 py-1 text-red-600 hover:text-red-800 text-sm hover:bg-red-50 rounded"
                   >
                     Remove
                   </button>
                 )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Input</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Input <span className="text-gray-500">(as read from stdin)</span>
+                  </label>
                   <textarea
                     value={testCase.input}
                     onChange={(e) => updateTestCase(index, 'input', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    rows={2}
-                    placeholder="Enter input values"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+                    rows={3}
+                    placeholder="Enter input values line by line"
                   />
+                  <div className="text-xs text-gray-500 mt-1">
+                    Example: For array sum: "5\n1 2 3 4 5"
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Expected Output</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Expected Output <span className="text-gray-500">(exact format)</span>
+                  </label>
                   <textarea
                     value={testCase.expected_output}
                     onChange={(e) => updateTestCase(index, 'expected_output', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
+                    rows={3}
                     placeholder="Enter expected output"
                   />
+                  <div className="text-xs text-gray-500 mt-1">
+                    Example: "15" or "Hello World" or "1\n2\n3"
+                  </div>
                 </div>
               </div>
             </div>
@@ -254,7 +315,7 @@ export default function CodeEditor({ question }: CodeEditorProps) {
                     : 'border-red-200 bg-red-50'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center">
                     {result.status === 'PASSED' ? (
                       <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
@@ -264,7 +325,7 @@ export default function CodeEditor({ question }: CodeEditorProps) {
                     <span className="font-medium">Test Case {index + 1}</span>
                   </div>
                   <span
-                    className={`px-2 py-1 rounded text-xs font-medium ${
+                    className={`px-3 py-1 rounded text-sm font-medium ${
                       result.status === 'PASSED'
                         ? 'bg-green-100 text-green-800'
                         : result.status === 'FAILED'
@@ -279,23 +340,29 @@ export default function CodeEditor({ question }: CodeEditorProps) {
                 {result.error ? (
                   <div className="text-sm">
                     <div className="font-medium text-gray-700 mb-1">Error:</div>
-                    <pre className="text-red-600 bg-white p-2 rounded overflow-x-auto">
+                    <pre className="text-red-600 bg-white p-3 rounded border overflow-x-auto">
                       {result.error}
                     </pre>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                     <div>
                       <div className="font-medium text-gray-700 mb-1">Input</div>
-                      <pre className="bg-white p-2 rounded overflow-x-auto">{result.input}</pre>
+                      <pre className="bg-white p-3 rounded border overflow-x-auto whitespace-pre-wrap">
+                        {result.input || <em className="text-gray-500">No input</em>}
+                      </pre>
                     </div>
                     <div>
                       <div className="font-medium text-gray-700 mb-1">Expected</div>
-                      <pre className="bg-white p-2 rounded overflow-x-auto">{result.expected}</pre>
+                      <pre className="bg-white p-3 rounded border overflow-x-auto whitespace-pre-wrap">
+                        {result.expected}
+                      </pre>
                     </div>
                     <div>
-                      <div className="font-medium text-gray-700 mb-1">Output</div>
-                      <pre className="bg-white p-2 rounded overflow-x-auto">
+                      <div className="font-medium text-gray-700 mb-1">Your Output</div>
+                      <pre className={`p-3 rounded border overflow-x-auto whitespace-pre-wrap ${
+                        result.status === 'PASSED' ? 'bg-green-50' : 'bg-yellow-50'
+                      }`}>
                         {result.output || <em className="text-gray-500">No output</em>}
                       </pre>
                     </div>
@@ -309,3 +376,4 @@ export default function CodeEditor({ question }: CodeEditorProps) {
     </div>
   );
 }
+// [file content end]

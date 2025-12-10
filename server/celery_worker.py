@@ -305,261 +305,189 @@ def render_html_report(user, month, quiz_count, avg_score, best_quiz, subject_br
 
 @celery.task(name='celery_worker.send_ai_enhanced_monthly_reports')
 def send_ai_enhanced_monthly_reports():
-    """Send monthly reports with AI-powered insights"""
     now = datetime.utcnow()
-    first_day_current = now.replace(day=1)
-    last_day_prev = first_day_current - timedelta(days=1)
-    first_day_prev = last_day_prev.replace(day=1)
+
+    # --- OLD LOGIC (Previous Month - Comment this out for testing) ---
+    # first_day_current = now.replace(day=1)
+    # last_day_prev = first_day_current - timedelta(days=1)
+    # first_day_prev = last_day_prev.replace(day=1)
+    # start_date = first_day_prev
+    # end_date = first_day_current
+
+    # --- NEW LOGIC (Current Month - Use this for testing) ---
+    # Start: 1st of this month
+    start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    # End: Right now (or start of next month)
+    end_date = now 
     
     users = User.query.filter_by(role=Role.USER).all()
-    print(f"Processing {len(users)} students for AI-enhanced monthly reports")
     
     for user in users:
-        print(f"Processing AI report for student: {user.email}")
-        
-        # Get user performance data for the previous month
+        # Update the call to use start_date and end_date
         performance_data = ai_report_generator.get_user_performance_data(
-            user.id, first_day_prev, first_day_current
+            user.id, start_date, end_date
         )
         
-        if not performance_data['quiz_performance']:
-            print(f"No quiz attempts found for student {user.email}")
+        if not performance_data['has_activity']:
+            print(f"No activity found for {user.email}")
             continue
-        
-        # Generate AI-powered report
+            
         ai_report = ai_report_generator.generate_insightful_report(
             performance_data, 
             user.full_name, 
-            first_day_prev.strftime("%B %Y")
+            start_date.strftime("%B %Y") # Pass current Month Name
         )
         
-        # Generate enhanced HTML content with AI insights
         html_content = render_ai_enhanced_html_report(
             user=user,
-            month=first_day_prev.strftime("%B %Y"),
+            month=start_date.strftime("%B %Y"), # Pass current Month Name
             performance_data=performance_data,
             ai_insights=ai_report
         )
 
-        # Send email with AI-enhanced report
         send_html_email.delay(
             recipient=user.email,
             name=user.full_name,
-            subject=f"Quizlytics AI Insights Report - {first_day_prev.strftime('%B %Y')}",
+            subject=f"Your Monthly Growth Report - {start_date.strftime('%B %Y')}",
             html_content=html_content
         )
-        
-        # Add delay to avoid rate limiting
         time.sleep(2)
 
 def render_ai_enhanced_html_report(user, month, performance_data, ai_insights):
-    """Render HTML report with AI-powered insights"""
-    
     template = Template("""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>Quizlytics AI Insights Report</title>
+        <title>Quizlytics Comprehensive Report</title>
         <style>
-            body { 
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-                color: #333; 
-                line-height: 1.6;
-            }
-            .container { 
-                max-width: 900px; 
-                margin: 0 auto; 
-                padding: 20px; 
-            }
-            .header { 
-                background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%); 
-                color: white; 
-                padding: 30px; 
-                border-radius: 10px 10px 0 0; 
-            }
-            .content { 
-                background: #fff; 
-                padding: 30px; 
-                border-radius: 0 0 10px 10px; 
-                box-shadow: 0 4px 20px rgba(0,0,0,0.1); 
-            }
-            .stats-container { 
-                display: flex; 
-                justify-content: space-between; 
-                margin-bottom: 30px; 
-                flex-wrap: wrap; 
-            }
-            .stat-card { 
-                background: #f8f9fa; 
-                border-radius: 10px; 
-                padding: 20px; 
-                text-align: center; 
-                flex: 1; 
-                min-width: 150px; 
-                margin: 10px; 
-                box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
-            }
-            .stat-value { 
-                font-size: 2rem; 
-                font-weight: bold; 
-                color: #2575fc; 
-            }
-            .stat-label { 
-                font-size: 0.9rem; 
-                color: #6c757d; 
-            }
-            .ai-insights {
-                background: #fff3cd;
-                border-left: 4px solid #ffc107;
-                padding: 20px;
-                margin: 25px 0;
-                border-radius: 0 8px 8px 0;
-            }
-            .insight-section {
-                margin: 25px 0;
-                padding: 20px;
-                background: #f8f9fa;
-                border-radius: 8px;
-            }
-            .insight-section h3 {
-                color: #2575fc;
-                border-bottom: 2px solid #2575fc;
-                padding-bottom: 10px;
-            }
-            table { 
-                width: 100%; 
-                border-collapse: collapse; 
-                margin: 25px 0; 
-            }
-            th, td { 
-                padding: 12px 15px; 
-                text-align: left; 
-                border-bottom: 1px solid #e0e0e0; 
-            }
-            th { 
-                background-color: #f1f8ff; 
-                font-weight: 600; 
-            }
-            tr:hover { 
-                background-color: #f9f9f9; 
-            }
-            .footer { 
-                text-align: center; 
-                margin-top: 40px; 
-                color: #6c757d; 
-                font-size: 0.9rem; 
-            }
-            .dashboard-link { 
-                display: inline-block; 
-                margin-top: 20px; 
-                padding: 10px 20px;
-                background-color: #2575fc; 
-                color: white; 
-                text-decoration: none;
-                border-radius: 5px; 
-                font-weight: bold; 
-            }
-            .ai-badge {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                padding: 5px 10px;
-                border-radius: 15px;
-                font-size: 0.8rem;
-                margin-left: 10px;
-            }
+            body { font-family: 'Segoe UI', sans-serif; color: #333; line-height: 1.6; }
+            .container { max-width: 900px; margin: 0 auto; padding: 20px; background: #fdfdfd; }
+            .header { background: linear-gradient(135deg, #6a11cb, #2575fc); color: white; padding: 30px; border-radius: 12px 12px 0 0; }
+            .section-title { color: #2575fc; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; }
+            .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin: 20px 0; }
+            .stat-box { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); text-align: center; border: 1px solid #eee; }
+            .stat-val { font-size: 1.5rem; font-weight: bold; color: #333; }
+            .stat-lbl { font-size: 0.85rem; color: #777; text-transform: uppercase; letter-spacing: 0.5px; }
+            
+            .ai-summary { background: #eef2ff; border-left: 5px solid #2575fc; padding: 20px; border-radius: 4px; margin: 20px 0; white-space: pre-line; }
+            
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
+            th { background: #f8f9fa; padding: 12px; text-align: left; font-size: 0.9rem; color: #555; }
+            td { padding: 12px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+            
+            .badge-success { color: #28a745; font-weight: bold; }
+            .badge-fail { color: #dc3545; }
+            .badge-warn { color: #ffc107; }
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>🎯 Quizlytics AI Insights Report</h1>
-                <h2>{{ month }} Performance Analysis</h2>
-                <span class="ai-badge">AI-Powered Insights</span>
+                <h1>🚀 Monthly Progress Report</h1>
+                <p>Performance analysis for {{ month }}</p>
             </div>
-            
-            <div class="content">
-                <p>Hello <strong>{{ user.full_name }}</strong>,</p>
-                <p>Here's your personalized monthly performance report with AI-generated insights to help you excel!</p>
-                
-                <!-- Performance Overview -->
-                <div class="stats-container">
-                    <div class="stat-card">
-                        <div class="stat-value">{{ performance_data.total_quizzes }}</div>
-                        <div class="stat-label">Quizzes Taken</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">{{ performance_data.overall_accuracy }}%</div>
-                        <div class="stat-label">Overall Accuracy</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">{{ performance_data.total_correct }}/{{ performance_data.total_questions }}</div>
-                        <div class="stat-label">Correct Answers</div>
-                    </div>
+
+            <div class="ai-summary">
+                <h3>🤖 Mentor's Analysis</h3>
+                {{ ai_insights }}
+            </div>
+
+            <h2 class="section-title">📚 Knowledge & Theory</h2>
+            <div class="stat-grid">
+                <div class="stat-box">
+                    <div class="stat-val">{{ performance_data.quiz_stats.total_quizzes }}</div>
+                    <div class="stat-lbl">Quizzes</div>
                 </div>
-                
-                <!-- AI Insights Section -->
-                <div class="ai-insights">
-                    <h3>🤖 AI-Powered Performance Analysis</h3>
-                    <div style="white-space: pre-line; margin-top: 15px;">{{ ai_insights }}</div>
+                <div class="stat-box">
+                    <div class="stat-val">{{ performance_data.quiz_stats.overall_accuracy }}%</div>
+                    <div class="stat-lbl">Accuracy</div>
                 </div>
-                
-                <!-- Detailed Performance -->
-                <div class="insight-section">
-                    <h3>📊 Detailed Quiz Performance</h3>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Quiz Name</th>
-                                <th>Score</th>
-                                <th>Correct Answers</th>
-                                <th>Completion Date</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for quiz in performance_data.quiz_performance %}
-                            <tr>
-                                <td>{{ quiz.quiz_name }}</td>
-                                <td>{{ quiz.score_percentage }}%</td>
-                                <td>{{ quiz.correct_answers }}/{{ quiz.total_questions }}</td>
-                                <td>{{ quiz.completion_date }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+            </div>
+            {% if performance_data.quiz_performance %}
+            <table>
+                <thead><tr><th>Subject</th><th>Chapter</th><th>Score</th></tr></thead>
+                <tbody>
+                {% for quiz in performance_data.quiz_performance[:5] %}
+                <tr>
+                    <td>{{ quiz.quiz_name.split(' - ')[0] }}</td>
+                    <td>{{ quiz.quiz_name.split(' - ')[1] }}</td>
+                    <td>
+                        <span class="{% if quiz.score_percentage >= 70 %}badge-success{% else %}badge-fail{% endif %}">
+                            {{ quiz.score_percentage }}%
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p><i>No quizzes taken this month.</i></p>
+            {% endif %}
+
+            <h2 class="section-title">💻 Coding Practice</h2>
+            <div class="stat-grid">
+                <div class="stat-box">
+                    <div class="stat-val">{{ performance_data.coding_stats.problems_solved }}</div>
+                    <div class="stat-lbl">Problems Solved</div>
                 </div>
-                
-                <!-- Subject Breakdown -->
-                <div class="insight-section">
-                    <h3>📚 Subject-Wise Performance</h3>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Subject</th>
-                                <th>Accuracy</th>
-                                <th>Correct/Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for subject in performance_data.subject_breakdown %}
-                            <tr>
-                                <td>{{ subject.subject }}</td>
-                                <td>{{ subject.accuracy }}%</td>
-                                <td>{{ subject.correct }}/{{ subject.total }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="stat-box">
+                    <div class="stat-val">{{ performance_data.coding_stats.total_submissions }}</div>
+                    <div class="stat-lbl">Submissions</div>
                 </div>
-                
-                <a href="http://localhost:5173/dashboard" class="dashboard-link">
-                    Continue Your Learning Journey
-                </a>
-                
-                <div class="footer">
-                    <p>Quizlytics AI Insights Report • Generated on {{ now.strftime('%Y-%m-%d') }}</p>
-                    <p>Your success is our priority! Keep pushing your boundaries! 🚀</p>
+            </div>
+            {% if performance_data.coding_performance %}
+            <table>
+                <thead><tr><th>Problem</th><th>Topic</th><th>Status</th><th>Cases</th></tr></thead>
+                <tbody>
+                {% for sub in performance_data.coding_performance[:5] %}
+                <tr>
+                    <td>{{ sub.problem_title }}</td>
+                    <td>{{ sub.topic }}</td>
+                    <td>
+                        <span class="{% if sub.status == 'Accepted' %}badge-success{% else %}badge-fail{% endif %}">
+                            {{ sub.status }}
+                        </span>
+                    </td>
+                    <td>{{ sub.passed_cases }}/{{ sub.total_cases }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p><i>No coding problems attempted this month.</i></p>
+            {% endif %}
+
+            <h2 class="section-title">🗣️ Interview Readiness</h2>
+            <div class="stat-grid">
+                <div class="stat-box">
+                    <div class="stat-val">{{ performance_data.interview_stats.total_sessions }}</div>
+                    <div class="stat-lbl">Mock Sessions</div>
                 </div>
+                <div class="stat-box">
+                    <div class="stat-val">{{ performance_data.interview_stats.avg_score }}</div>
+                    <div class="stat-lbl">Avg Score</div>
+                </div>
+            </div>
+            {% if performance_data.interview_performance %}
+            <table>
+                <thead><tr><th>Date</th><th>Score</th><th>Key Feedback</th></tr></thead>
+                <tbody>
+                {% for intv in performance_data.interview_performance %}
+                <tr>
+                    <td>{{ intv.date }}</td>
+                    <td><strong>{{ intv.score }}</strong>/100</td>
+                    <td>{{ intv.weaknesses }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p><i>No interview sessions recorded this month.</i></p>
+            {% endif %}
+
+            <div style="text-align: center; margin-top: 40px; color: #888; font-size: 0.8rem;">
+                Generated by Quizlytics AI • <a href="http://localhost:5173/dashboard">Go to Dashboard</a>
             </div>
         </div>
     </body>
@@ -570,8 +498,7 @@ def render_ai_enhanced_html_report(user, month, performance_data, ai_insights):
         user=user,
         month=month,
         performance_data=performance_data,
-        ai_insights=ai_insights,
-        now=datetime.utcnow()
+        ai_insights=ai_insights
     )
 
 @celery.task
