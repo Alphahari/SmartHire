@@ -14,7 +14,7 @@ interface submissionInterface {
 
 export async function submitCode(submission: submissionInterface) {
   try {
-    const response = await fetch('http://localhost:3000/api/submission', {
+    const response = await fetch(`${process.env.BASE_API_URL}/submission`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

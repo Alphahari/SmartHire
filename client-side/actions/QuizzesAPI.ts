@@ -4,7 +4,7 @@ import { Quiz } from "@/types/Quiz";
 export async function fetchQuizzesByChapter(chapterId: number) {
   try {
     const response = await fetch(
-      `http://localhost:5000/api/chapters/${chapterId}`,
+      `${process.env.NEXT_PUBLIC_BASE_URL}/api/chapters/${chapterId}`,
       {
         credentials: 'include',
       }
@@ -24,7 +24,7 @@ export async function fetchQuizzesByChapter(chapterId: number) {
 
 export async function addQuiz(quizData: Omit<Quiz, 'id'>) {
   try {
-    const response = await fetch('http://localhost:5000/api/admin/quizzes', {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/quizzes`, {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -46,7 +46,7 @@ export async function addQuiz(quizData: Omit<Quiz, 'id'>) {
 
 export async function updateQuiz(id: string, quizData: Partial<Quiz>) {
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/quizzes/${id}`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/quizzes/${id}`, {
       method: 'PUT',
       credentials: 'include',
       headers: {
@@ -68,7 +68,7 @@ export async function updateQuiz(id: string, quizData: Partial<Quiz>) {
 
 export async function deleteQuiz(id: string) {
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/quizzes/${id}`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/quizzes/${id}`, {
       method: 'DELETE',
       credentials: 'include',
     });
@@ -86,7 +86,7 @@ export async function deleteQuiz(id: string) {
 
 export async function fetchQuizById(quizId: number) {
   try {
-    const response = await fetch(`http://localhost:5000/api/quiz/${quizId}`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/quiz/${quizId}`, {
       credentials: 'include',
     });
     
@@ -103,7 +103,7 @@ export async function fetchQuizById(quizId: number) {
 
 export async function fetchQuizDuration(quizId: number) {
   try {
-    const response = await fetch(`http://localhost:5000/api/quiz/${quizId}`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/quiz/${quizId}`, {
       credentials: 'include',
     });
     
@@ -121,7 +121,7 @@ export async function fetchQuizDuration(quizId: number) {
 
 export async function fetchAllQuizzes() {
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/quizzes`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/quizzes`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

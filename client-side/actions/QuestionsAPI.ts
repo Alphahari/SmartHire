@@ -4,7 +4,7 @@ import { Question } from "@/types/Question";
 export async function fetchQuestionsByQuiz(quizId: number) {
   try {
     const response = await fetch(
-      `http://localhost:5000/api/admin/quiz/${quizId}`,
+      `${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/quiz/${quizId}`,
       {
         credentials: 'include',
       }
@@ -24,7 +24,7 @@ export async function fetchQuestionsByQuiz(quizId: number) {
 
 export async function addQuestion(questionData: Omit<Question, 'id'>) {
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/quizzes/${questionData.quiz_id}/questions`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/quizzes/${questionData.quiz_id}/questions`, {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -46,7 +46,7 @@ export async function addQuestion(questionData: Omit<Question, 'id'>) {
 
 export async function updateQuestion(id: string, questionData: Partial<Question>) {
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/questions/${id}`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/questions/${id}`, {
       method: 'PUT',
       credentials: 'include',
       headers: {
@@ -68,7 +68,7 @@ export async function updateQuestion(id: string, questionData: Partial<Question>
 
 export async function deleteQuestion(id: string) {
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/questions/${id}`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/questions/${id}`, {
       method: 'DELETE',
       credentials: 'include',
     });

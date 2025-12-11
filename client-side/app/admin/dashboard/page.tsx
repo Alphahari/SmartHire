@@ -47,7 +47,7 @@ export default function AdminDashboard() {
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
-        return <StatsOverview subjects={subjects} />;
+        return <StatsOverview subjects={subjects} setActiveTab={setActiveTab} />;;
       case 'subjects':
         return (
           <SubjectManagement
@@ -66,7 +66,7 @@ export default function AdminDashboard() {
       case 'analytics':
         return <AdminAnalytics />;
       default:
-        return <StatsOverview subjects={subjects} />;
+        return <StatsOverview subjects={subjects} setActiveTab={setActiveTab} />;
     }
   };
 

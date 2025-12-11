@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -48,6 +47,7 @@ export default function MockTestsPage() {
       console.error(err);
     }
   };
+  
 
   if (loading) {
     return (

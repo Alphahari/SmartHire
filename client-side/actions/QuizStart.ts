@@ -3,7 +3,7 @@
 
 export async function startQuiz(quizId: number, userId: number) {
   try {
-    const response = await fetch(`http://localhost:5000/api/quizzes/${quizId}/start`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/quizzes/${quizId}/start`, {
       method: 'POST',
       credentials: 'include',
       headers: {

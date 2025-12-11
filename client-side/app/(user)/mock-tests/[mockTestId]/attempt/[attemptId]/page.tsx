@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import UserProtectedRoute from '@/components/UserComponents/UserProtectedRoute';
 
@@ -21,7 +21,9 @@ export default function MockTestAttemptPage() {
 
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session } = useSession();
+  const userId = session?.user?.id;
 
   const mockTestId = parseInt(params.mockTestId as string);
   const attemptId = parseInt(params.attemptId as string);
@@ -32,6 +34,21 @@ export default function MockTestAttemptPage() {
       loadMockTestDetails();
     }
   }, [mockTestId]);
+
+  /** Check for returning from quiz */
+  useEffect(() => {
+    const quizScoreParam = searchParams.get('quizScore');
+    if (quizScoreParam && currentStep === 'quiz') {
+      const score = parseFloat(quizScoreParam);
+      setQuizScore(score);
+      setCurrentStep('coding');
+      
+      // Remove query param
+      const url = new URL(window.location.href);
+      url.searchParams.delete('quizScore');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [searchParams, currentStep]);
 
   const loadMockTestDetails = async () => {
     try {
@@ -56,6 +73,22 @@ export default function MockTestAttemptPage() {
     setCurrentStep('coding');
   };
 
+  /** Start Quiz button handler */
+  const handleStartQuiz = () => {
+    if (!mockTestDetails) return;
+    
+    // Store mock test context for after quiz completion
+    localStorage.setItem('mockTestContext', JSON.stringify({
+      mockTestId,
+      attemptId,
+      quizId: mockTestDetails.quiz.id,
+      returnUrl: `/mock-tests/${mockTestId}/attempt/${attemptId}`
+    }));
+    
+    // Navigate to quiz with mock test context
+    router.push(`/quiz/${mockTestDetails.quiz.id}?mockTest=true&attempt=${attemptId}&mockTestId=${mockTestId}`);
+  };
+
   /** Coding complete handler */
   const handleCodingComplete = async (score: number) => {
     setCodingScore(score);
@@ -63,6 +96,7 @@ export default function MockTestAttemptPage() {
 
     try {
       await submitMockTestAttempt(attemptId, {
+        user_id: Number(userId),
         quiz_score: quizScore || 0,
         coding_score: score,
         time_spent: timeSpent
@@ -71,6 +105,25 @@ export default function MockTestAttemptPage() {
       console.error('Failed to submit mock test results:', err);
     }
   };
+
+  /** Start Coding button handler */
+const handleStartCoding = () => {
+  if (!mockTestDetails) return;
+  
+  // Store mock test context for coding
+  localStorage.setItem('mockTestCodingContext', JSON.stringify({
+    mockTestId,
+    attemptId,
+    quizScore: quizScore || 0,
+    questionId: mockTestDetails.coding_question.id
+  }));
+  
+  // Navigate to coding with mock test context - FIXED ROUTE
+  // From: /coding/practice
+  // To: /coding (which is your UserCodingPage)
+  router.push(`/code?question=${mockTestDetails.coding_question.id}&mockTest=true&attempt=${attemptId}&quizScore=${quizScore || 0}`);
+};
+
 
   const calculateTotalScore = () => {
     if (quizScore === null || codingScore === null) return 0;
@@ -135,7 +188,7 @@ export default function MockTestAttemptPage() {
                 </button>
 
                 <button
-                  onClick={() => router.push(`/quiz/${mockTestDetails.quiz.id}?attempt=${attemptId}`)}
+                  onClick={handleStartQuiz}
                   className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
                   Start Quiz
@@ -209,9 +262,7 @@ export default function MockTestAttemptPage() {
                   </p>
 
                   <button
-                    onClick={() =>
-                      router.push(`/coding/practice?question=${mockTestDetails.coding_question.id}&attempt=${attemptId}`)
-                    }
+                    onClick={handleStartCoding}
                     className="w-full mt-6 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700"
                   >
                     Start Coding Challenge

@@ -3,7 +3,7 @@ import { Chapter } from "@/types/Chapter";
 
 export async function fetchChaptersBySubject(subjectId: number): Promise<Chapter[] | null> {
   try {
-    const response = await fetch(`http://localhost:5000/api/subjects/${subjectId}`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/subjects/${subjectId}`, {
       credentials: 'include',
     });
     
@@ -20,7 +20,7 @@ export async function fetchChaptersBySubject(subjectId: number): Promise<Chapter
 }
 export async function addChapter(chapterData: Omit<Chapter, 'id'>) {
   try {
-    const response = await fetch('http://localhost:5000/api/admin/chapters', {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/chapters`, {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -42,7 +42,7 @@ export async function addChapter(chapterData: Omit<Chapter, 'id'>) {
 
 export async function updateChapter(id: string, chapterData: Partial<Chapter>) {
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/chapters/${id}`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/chapters/${id}`, {
       method: 'PUT',
       credentials: 'include',
       headers: {
@@ -64,7 +64,7 @@ export async function updateChapter(id: string, chapterData: Partial<Chapter>) {
 
 export async function deleteChapter(id: string) {
   try {
-    const response = await fetch(`http://localhost:5000/api/admin/chapters/${id}`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/chapters/${id}`, {
       method: 'DELETE',
       credentials: 'include',
     });

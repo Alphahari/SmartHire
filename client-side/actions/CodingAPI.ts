@@ -3,7 +3,6 @@
 import { CodingTopic, CodingQuestion, TestCase } from '@/./types/Coding';
 
 const API_BASE_URL : String = process.env.NEXT_PUBLIC_BASE_URL ? process.env.NEXT_PUBLIC_BASE_URL+"/api" : "http://localhost:5000/api"
-console.log(API_BASE_URL)
 
 export const fetchCodingTopics = async (): Promise<CodingTopic[]> => {
   const response = await fetch(`${API_BASE_URL}/admin/coding/topics`, {

@@ -4,7 +4,7 @@
     {
       "label": "backend-flask",
       "type": "shell",
-      "command": "cd server && source venv/bin/activate && flask run",
+      "command": "cd server && source venv/bin/activate && python3 app.py",
       "problemMatcher": []
     },
     {
@@ -31,8 +31,6 @@
       "command": "cd server && docker compose up -d",
       "problemMatcher": []
     },
-
-    // --- New meta task #1 ---
     {
       "label": "start-services",
       "dependsOn": [
@@ -43,15 +41,14 @@
       ],
       "dependsOrder": "parallel"
     },
-
-    // --- New meta task #2 (main entry point) ---
     {
       "label": "start-all",
       "dependsOn": [
-        "docker-compose",    // Runs first
-        "start-services"     // Runs after docker-compose
+        "docker-compose",
+        "start-services"
       ],
-      "dependsOrder": "sequence"
+      "dependsOrder": "sequence",
+      "problemMatcher": []
     }
   ]
 }

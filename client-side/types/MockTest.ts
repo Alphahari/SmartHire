@@ -50,3 +50,10 @@ export interface MockTestAttempt {
   completed_at: string | null;
   user_name?: string;
 }
+
+export interface MockTestSubmissionData {
+  quiz_score: number;
+  coding_score: number;
+  time_spent: number;
+  user_id: number; // <--- Add this
+}

@@ -3,7 +3,7 @@ import { Subject } from "@/types/Subject";
 
 export const fetchSubjects = async (): Promise<Subject[] | null> => {
   try {
-    const res = await fetch('http://localhost:5000/api/subjects', {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/subjects`, {
       method: 'GET',
       cache: 'no-store',
       credentials: 'include',
@@ -24,33 +24,10 @@ export const fetchSubjects = async (): Promise<Subject[] | null> => {
     return null;
   }
 };
-// export const fetchSubjects = async (): Promise<Subject[] | null> => {
-//   try {
-//     const res = await fetch('http://localhost:5000/api/subjects', {
-//       method: 'GET',
-//       cache: 'no-store',
-//       credentials: 'include',
-//       headers: {
-//         'Content-Type': 'application/json',
-//       },
-//     });
-
-//     if (!res.ok) {
-//       console.error('Failed to fetch subjects:', res.statusText);
-//       return null;
-//     }
-
-//     const data: Subject[] = await res.json();
-//     return data;
-//   } catch (error) {
-//     console.error('Error fetching subjects:', error);
-//     return null;
-//   }
-// };
 
 export const addSubject = async (subjectData: Omit<Subject, 'id'>): Promise<Subject | null> => {
   try {
-    const res = await fetch('http://localhost:5000/api/admin/subjects', {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/subjects`, {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -74,7 +51,7 @@ export const addSubject = async (subjectData: Omit<Subject, 'id'>): Promise<Subj
 
 export const updateSubject = async (id: string, subjectData: Partial<Subject>): Promise<Subject | null> => {
   try {
-    const res = await fetch(`http://localhost:5000/api/admin/subjects/${id}`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/subjects/${id}`, {
       method: 'PUT',
       credentials: 'include',
       headers: {
@@ -98,7 +75,7 @@ export const updateSubject = async (id: string, subjectData: Partial<Subject>): 
 
 export const deleteSubject = async (id: string): Promise<boolean> => {
   try {
-    const res = await fetch(`http://localhost:5000/api/admin/subjects/${id}`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/subjects/${id}`, {
       method: 'DELETE',
       credentials: 'include',
     });

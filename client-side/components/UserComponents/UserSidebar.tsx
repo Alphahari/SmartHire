@@ -61,7 +61,7 @@ const UserSidebar = () => {
       <div className="h-20 flex flex-col justify-center px-6 border-b border-slate-800 bg-slate-950">
         <div className="flex items-center gap-2 text-blue-500">
            {/* Simple Logo Icon */}
-           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">S</div>
+           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-lg"><img src="icon.png"></img></div>
            <h2 className="text-xl font-bold text-white tracking-wide">SmartHire</h2>
         </div>
       </div>

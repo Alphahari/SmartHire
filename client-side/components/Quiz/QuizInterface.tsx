@@ -1,7 +1,8 @@
 // components/Quiz/QuizInterface.tsx
+// components/Quiz/QuizInterface.tsx
 "use client"
 import { Question } from '@/types/Question';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 interface QuizInterfaceProps {
   questions: Question[];
@@ -16,6 +17,7 @@ interface QuizInterfaceProps {
   onSubmit: () => void;
   onTimeUpdate: (timeRemaining: number) => void;
   submitting: boolean;
+  isMockTest?: boolean;
 }
 
 const QuizInterface = ({
@@ -26,26 +28,54 @@ const QuizInterface = ({
   onPrevQuestion,
   onSubmit,
   onTimeUpdate,
-  submitting
+  submitting,
+  isMockTest = false,
 }: QuizInterfaceProps) => {
   const [localTime, setLocalTime] = useState(quizState.timeRemaining);
+  const lastUpdateTime = useRef(Date.now());
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Timer logic - fixed version
   useEffect(() => {
-    const timer = setInterval(() => {
-      setLocalTime(prevTime => {
-        if (prevTime <= 0) {
-          clearInterval(timer);
-          onSubmit();
-          return 0;
+    // Clear any existing timeout
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+    
+    // Don't run timer if time is 0
+    if (localTime <= 0) {
+      onSubmit();
+      return;
+    }
+    
+    updateTimeoutRef.current = setTimeout(() => {
+      const now = Date.now();
+      const elapsed = now - lastUpdateTime.current;
+      
+      // Only update if at least 1 second has passed
+      if (elapsed >= 1000) {
+        const newTime = localTime - 1;
+        setLocalTime(newTime);
+        lastUpdateTime.current = now;
+        
+        // Update parent with debounce
+        if (newTime % 5 === 0 || newTime <= 10) { // Update parent less frequently
+          onTimeUpdate(newTime);
         }
-        const newTime = prevTime - 1;
-        // onTimeUpdate(newTime);
-        return newTime;
-      });
+      }
     }, 1000);
-
-    return () => clearInterval(timer);
-  }, [onSubmit, onTimeUpdate]);
+    
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, [localTime, onSubmit, onTimeUpdate]);
+  
+  // Sync with parent time when quizState changes
+  useEffect(() => {
+    setLocalTime(quizState.timeRemaining);
+  }, [quizState.timeRemaining]);
 
   // Add null checks for current question
   const currentQuestion = questions[quizState.currentQuestionIndex];
@@ -81,6 +111,31 @@ const QuizInterface = ({
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-4xl mx-auto">
+        {/* Mock Test Banner - ADDED HERE */}
+        {isMockTest && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center">
+              <span className="text-blue-600 mr-2">📋</span>
+              <span className="text-blue-700 font-medium">Mock Test Quiz</span>
+              <span className="ml-auto text-sm text-blue-600">
+                Complete to proceed to coding challenge
+              </span>
+            </div>
+          </div>
+        )}
+        {/* Mock Test Banner - ADDED HERE */}
+        {isMockTest && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center">
+              <span className="text-blue-600 mr-2">📋</span>
+              <span className="text-blue-700 font-medium">Mock Test Quiz</span>
+              <span className="ml-auto text-sm text-blue-600">
+                Complete to proceed to coding challenge
+              </span>
+            </div>
+          </div>
+        )}
+        
         {/* Header */}
         <div className="bg-white shadow rounded-lg p-4 mb-6">
           <h1 className="text-2xl font-bold text-primary mb-2">Quiz in Progress</h1>

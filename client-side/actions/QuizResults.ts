@@ -2,7 +2,7 @@
 "use server"
 export async function fetchQuizAttempt(quizId: number, userId: number) {
   try {
-    const response = await fetch(`http://localhost:5000/api/quizzes/attempt`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/quizzes/attempt`, {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -34,7 +34,7 @@ export async function fetchQuizAttempt(quizId: number, userId: number) {
 
 export async function fetchQuizResults(attemptId: number, userId: number) {
   try {
-    const response = await fetch(`http://localhost:5000/api/quiz_attempts/${attemptId}/results`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/quiz_attempts/${attemptId}/results`, {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -59,7 +59,7 @@ export async function fetchQuizResults(attemptId: number, userId: number) {
 // For QuizAttemptStatus
 export async function fetchQuizAttemptStatus(chapterId: number, userId: number) {
   try {
-    const response = await fetch(`http://localhost:5000/api/quizzes/attempts`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/quizzes/attempts`, {
       method: 'POST',
       credentials: 'include',
       headers: {
@@ -85,7 +85,7 @@ export async function fetchQuizAttemptStatus(chapterId: number, userId: number) 
 // For UserQuizAttempts
 export async function fetchUserQuizAttempts(userId: number) {
   try {
-    const response = await fetch(`http://localhost:5000/api/user/quiz_attempts`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/user/quiz_attempts`, {
       method: 'POST',
       credentials: 'include',
       headers: {

@@ -30,9 +30,10 @@ export interface PerformanceDistributionData {
   needs_improvement: number;
 }
 
-export async function fetchSummaryStats(days?: number): Promise<SummaryStats> {
+// Individual API calls instead of single summary call
+export async function fetchTotalUsers(days?: number): Promise<number> {
   try {
-    const url = `${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/stats/summary${days ? `?days=${days}` : ''}`;
+    const url = `${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/stats/total-users${days ? `?days=${days}` : ''}`;
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -42,13 +43,110 @@ export async function fetchSummaryStats(days?: number): Promise<SummaryStats> {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch summary stats: ${response.statusText}`);
+      throw new Error(`Failed to fetch total users: ${response.statusText}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+    return data.totalUsers || 0;
   } catch (error) {
-    console.error('Error fetching summary stats:', error);
-    throw new Error('Failed to fetch summary stats');
+    console.error('Error fetching total users:', error);
+    return 0;
+  }
+}
+
+export async function fetchActiveUsers(days?: number): Promise<number> {
+  try {
+    const url = `${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/stats/active-users${days ? `?days=${days}` : ''}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch active users: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.activeUsers || 0;
+  } catch (error) {
+    console.error('Error fetching active users:', error);
+    return 0;
+  }
+}
+
+export async function fetchQuizzesTaken(days?: number): Promise<number> {
+  try {
+    const url = `${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/stats/quizzes-taken${days ? `?days=${days}` : ''}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch quizzes taken: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.quizzesTaken || 0;
+  } catch (error) {
+    console.error('Error fetching quizzes taken:', error);
+    return 0;
+  }
+}
+
+export async function fetchAvgScore(days?: number): Promise<number> {
+  try {
+    const url = `${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/stats/avg-score${days ? `?days=${days}` : ''}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch average score: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.avgScore || 0;
+  } catch (error) {
+    console.error('Error fetching average score:', error);
+    return 0;
+  }
+}
+
+// Combined summary for backward compatibility
+export async function fetchSummaryStats(days?: number): Promise<SummaryStats> {
+  try {
+    const [totalUsers, activeUsers, quizzesTaken, avgScore] = await Promise.all([
+      fetchTotalUsers(days),
+      fetchActiveUsers(days),
+      fetchQuizzesTaken(days),
+      fetchAvgScore(days)
+    ]);
+
+    return {
+      totalUsers,
+      activeUsers,
+      quizzesTaken,
+      avgScore
+    };
+  } catch (error) {
+    console.error('Error in fetchSummaryStats:', error);
+    return {
+      totalUsers: 0,
+      activeUsers: 0,
+      quizzesTaken: 0,
+      avgScore: 0
+    };
   }
 }
 
@@ -117,29 +215,20 @@ export async function fetchQuizActivity(days?: number): Promise<QuizActivityData
   }
 }
 
-export async function fetchPerformanceDistribution(): Promise<PerformanceDistributionData> {
+export const fetchPerformanceDistribution = async (): Promise<PerformanceDistributionData> => {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/stats/performance-distribution`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store',
-    });
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_BASE_URL}/api/admin/stats/performance-distribution`
+    );
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch performance distribution: ${response.statusText}`);
+      throw new Error('Failed to fetch performance distribution');
     }
 
     const data = await response.json();
-    return {
-      excellent: data[0] || 0,
-      good: data[1] || 0,
-      average: data[2] || 0,
-      needs_improvement: data[3] || 0
-    };
+    return data;
   } catch (error) {
     console.error('Error fetching performance distribution:', error);
-    throw new Error('Failed to fetch performance distribution');
+    throw error;
   }
-}
+};

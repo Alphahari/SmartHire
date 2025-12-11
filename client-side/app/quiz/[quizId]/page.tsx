@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { Loader2, AlertCircle } from 'lucide-react'; // Added icons
 
 import { Question } from '@/types/Question';
 import { fetchQuestionsByQuiz } from '@/actions/QuestionsAPI';
@@ -30,10 +29,13 @@ export default function QuizPage() {
   const [submitting, setSubmitting] = useState(false);
   const [hasAttempted, setHasAttempted] = useState(false);
   const [quizDuration, setQuizDuration] = useState<number>(0);
+  const [isMockTest, setIsMockTest] = useState(false);
+  const [mockTestContext, setMockTestContext] = useState<any>(null);
 
   const params = useParams();
   const quizId = parseInt(params.quizId as string);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session } = useSession();
   const userId = session?.user?.id;
   const numericUserId = Number(userId);
@@ -42,24 +44,36 @@ export default function QuizPage() {
   const LS_INDEX_KEY = `quiz_${quizId}_index`;
   const LS_ENDTIME_KEY = `quiz_${quizId}_endtime`;
 
-  // ... (Keep all existing useEffects and logic unchanged) ...
-  // Re-pasting logic for completeness not required, but assuming logic block is here
-  // [LOGIC SECTION - SAME AS BEFORE] 
-  
-  // -- FOR BRIEFNESS, ASSUME LOGIC IS IDENTICAL TO YOUR ORIGINAL FILE HERE --
-  // (I am only modifying the Render/Return statements below)
+  // Check if this is a mock test quiz
+  useEffect(() => {
+    const mockTestParam = searchParams.get('mockTest');
+    const attemptId = searchParams.get('attempt');
+    const mockTestId = searchParams.get('mockTestId');
 
-  // ... logic code ... 
-  
-  // Note: Ensure you keep the logic from your original file. 
-  // I will just paste the Render section fixes below.
+    if (mockTestParam === 'true' && attemptId && mockTestId) {
+      setIsMockTest(true);
+      setMockTestContext({
+        mockTestId: parseInt(mockTestId),
+        attemptId: parseInt(attemptId)
+      });
 
+      // Store context in localStorage for after submission
+      localStorage.setItem('mockTestContext', JSON.stringify({
+        mockTestId: parseInt(mockTestId),
+        attemptId: parseInt(attemptId),
+        quizId
+      }));
+    }
+  }, [searchParams, quizId]);
+
+  // ✅ Check if user has already attempted the quiz
   useEffect(() => {
     async function checkAttempt() {
       if (!quizId || !numericUserId) return;
+
       try {
         const attemptData = await fetchQuizAttempt(quizId, numericUserId);
-        if (attemptData?.has_attempt) {
+        if (attemptData?.has_attempt && !isMockTest) {
           setHasAttempted(true);
           router.push(`/quiz/${quizId}/results`);
         }
@@ -67,18 +81,22 @@ export default function QuizPage() {
         console.error('Error checking quiz attempt:', err);
       }
     }
-    checkAttempt();
-  }, [quizId, numericUserId, router]);
 
+    checkAttempt();
+  }, [quizId, numericUserId, router, isMockTest]);
+
+  // ✅ Fetch questions and initialize quiz
   useEffect(() => {
     async function loadQuestions() {
-      if (!quizId || hasAttempted) return;
+      if (!quizId || (hasAttempted && !isMockTest)) return;
+
       try {
         const questionsData = await fetchQuestionsByQuiz(quizId);
         if (!questionsData || questionsData.length === 0) {
           setError('No questions found for this quiz.');
           return;
         }
+
         setQuestions(questionsData);
         await initializeQuizState(questionsData);
       } catch (err) {
@@ -88,26 +106,41 @@ export default function QuizPage() {
         setLoading(false);
       }
     }
-    if (!hasAttempted) loadQuestions();
-  }, [quizId, hasAttempted, numericUserId]);
 
+    if (!hasAttempted || isMockTest) {
+      loadQuestions();
+    }
+  }, [quizId, hasAttempted, numericUserId, isMockTest]);
+
+  // ✅ Initialize quiz state with server action for duration
   const initializeQuizState = async (questions: Question[]) => {
     if (questions.length === 0) {
       setError('No questions found for this quiz.');
       return;
     }
+
     const savedAnswers = localStorage.getItem(LS_ANSWERS_KEY);
     const savedIndex = localStorage.getItem(LS_INDEX_KEY);
     const savedEndTime = localStorage.getItem(LS_ENDTIME_KEY);
+
     const initialAnswers: Record<number, number | null> = {};
-    questions.forEach(q => { initialAnswers[q.id] = null; });
+    questions.forEach(q => {
+      initialAnswers[q.id] = null;
+    });
+
     let endTime: Date | null = null;
     let timeRemaining = 0;
-    let duration = 60; 
+
+    // ✅ Use server action instead of client-side fetch
+    let duration = 60; // fallback duration in minutes
     try {
+      console.log("Fetching quiz duration for quiz ID:", quizId);
       duration = await fetchQuizDuration(quizId);
       setQuizDuration(duration);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error('Error fetching quiz duration:', err);
+      // Continue with fallback duration
+    }
 
     if (savedEndTime) {
       endTime = new Date(savedEndTime);
@@ -116,28 +149,45 @@ export default function QuizPage() {
       endTime = new Date(Date.now() + duration * 60 * 1000);
       timeRemaining = duration * 60;
       localStorage.setItem(LS_ENDTIME_KEY, endTime.toISOString());
+
       const startData = await startQuiz(quizId, numericUserId);
-      if (!startData) { setError('Failed to start quiz. You may have already attempted it.'); return; }
+      if (!startData) {
+        setError('Failed to start quiz. You may have already attempted it.');
+        return;
+      }
     }
+
     const initialState: QuizState = {
       currentQuestionIndex: savedIndex ? parseInt(savedIndex) : 0,
       answers: savedAnswers ? { ...initialAnswers, ...JSON.parse(savedAnswers) } : initialAnswers,
       timeRemaining,
       endTime,
     };
+
     setQuizState(initialState);
   };
 
+  // ✅ Answer selection
   const handleAnswerSelect = (questionId: number, option: number) => {
     if (!quizState) return;
-    const updatedAnswers = { ...quizState.answers, [questionId]: option };
-    const newState = { ...quizState, answers: updatedAnswers };
+
+    const updatedAnswers = {
+      ...quizState.answers,
+      [questionId]: option
+    };
+
+    const newState = {
+      ...quizState,
+      answers: updatedAnswers
+    };
+
     setQuizState(newState);
     localStorage.setItem(LS_ANSWERS_KEY, JSON.stringify(updatedAnswers));
   };
 
   const handleNextQuestion = () => {
     if (!quizState || quizState.currentQuestionIndex >= questions.length - 1) return;
+
     const newIndex = quizState.currentQuestionIndex + 1;
     setQuizState({ ...quizState, currentQuestionIndex: newIndex });
     localStorage.setItem(LS_INDEX_KEY, newIndex.toString());
@@ -145,6 +195,7 @@ export default function QuizPage() {
 
   const handlePrevQuestion = () => {
     if (!quizState || quizState.currentQuestionIndex <= 0) return;
+
     const newIndex = quizState.currentQuestionIndex - 1;
     setQuizState({ ...quizState, currentQuestionIndex: newIndex });
     localStorage.setItem(LS_INDEX_KEY, newIndex.toString());
@@ -154,95 +205,111 @@ export default function QuizPage() {
     setQuizState(prev => prev ? { ...prev, timeRemaining: newTime } : null);
   }, []);
 
-  const handleSubmit = async () => {
+  // In QuizPage.tsx, update the handleSubmit function:
+  const handleSubmit = useCallback(async () => {
     if (submitting || !quizState) return;
     setSubmitting(true);
+
     try {
       const result = await submitQuiz(quizId, quizState.answers, quizState.timeRemaining, numericUserId);
       if (result) {
         localStorage.removeItem(LS_ANSWERS_KEY);
         localStorage.removeItem(LS_INDEX_KEY);
         localStorage.removeItem(LS_ENDTIME_KEY);
-        router.push(`/quiz/${quizId}/results`);
-      } else { setError('Failed to submit quiz. Please try again.'); }
+
+        // Check if this is a mock test quiz
+        const mockTestContext = localStorage.getItem('mockTestContext');
+
+        if (mockTestContext && isMockTest) {
+          const context = JSON.parse(mockTestContext);
+          const { mockTestId, attemptId } = context;
+
+          // Clear the context
+          localStorage.removeItem('mockTestContext');
+
+          // Redirect back to mock test with quiz score
+          router.push(`/mock-tests/${mockTestId}/attempt/${attemptId}?quizScore=${result.score_percentage}`);
+        } else {
+          // Regular quiz flow
+          router.push(`/quiz/${quizId}/results`);
+        }
+      } else {
+        setError('Failed to submit quiz. Please try again.');
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Error submitting quiz:', err);
       setError('An error occurred while submitting the quiz.');
-    } finally { setSubmitting(false); }
-  };
+    } finally {
+      setSubmitting(false);
+    }
+  }, [quizId, quizState, numericUserId, submitting, isMockTest, router]);
 
-  // --- RENDER UPDATES START HERE ---
-
-  // FIX: Wrapped Loading UI in standard layout
+  // ✅ Loading UI
   if (loading || !quizState) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex flex-col items-center justify-center h-[60vh]">
-          <Loader2 className="h-10 w-10 animate-spin text-indigo-600 mb-4" />
-          <p className="text-gray-500 font-medium">Preparing your assessment...</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="spinner-border text-primary" role="status" />
+          <p className="mt-3">Loading quiz questions...</p>
         </div>
       </div>
     );
   }
 
-  // FIX: Wrapped Error UI in standard layout
+  // ✅ Error UI
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-xl mx-auto bg-white rounded-2xl shadow-xl p-8 text-center border border-red-100">
-          <div className="bg-red-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-             <AlertCircle className="text-red-500 w-8 h-8" />
-          </div>
-          <h4 className="font-bold text-xl text-gray-900 mb-2">Quiz Error</h4>
-          <p className="text-gray-500 mb-6">{error}</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="alert alert-danger max-w-md mx-auto p-4 rounded shadow">
+          <h4 className="font-bold text-lg mb-2">Quiz Error</h4>
+          <p className="text-sm mb-4">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition font-medium"
+            className="btn btn-sm btn-outline-secondary"
           >
-            Retry Connection
+            Retry
           </button>
         </div>
       </div>
     );
   }
 
-  // FIX: Wrapped Attempted Screen in standard layout
-  if (hasAttempted) {
+  // ✅ Redundant hasAttempted screen (safety net)
+  if (hasAttempted && !isMockTest) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-xl mx-auto bg-white rounded-2xl shadow-lg p-10 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-3">Quiz Already Attempted</h2>
-          <p className="text-gray-500 mb-8">
-            You have already recorded a score for this assessment.
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">
+            Quiz Already Attempted
+          </h2>
+          <p className="text-gray-600 mb-4">
+            You have already attempted this quiz. View your results instead.
           </p>
           <button
             onClick={() => router.push(`/quiz/${quizId}/results`)}
-            className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-indigo-700 transition shadow-md"
+            className="bg-blue-600 text-white px-4 py-2 rounded"
           >
-            View Your Results
+            View Results
           </button>
         </div>
       </div>
     );
   }
 
-  // FIX: Wrapped Main Interface in max-w-7xl to prevent full-width stretch
+  // ✅ Main quiz interface
   return (
     <UserProtectedRoute>
-      <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <QuizInterface
-            questions={questions}
-            quizState={quizState}
-            onAnswerSelect={handleAnswerSelect}
-            onNextQuestion={handleNextQuestion}
-            onPrevQuestion={handlePrevQuestion}
-            onSubmit={handleSubmit}
-            onTimeUpdate={handleTimeUpdate}
-            submitting={submitting}
-          />
-        </div>
-      </div>
+      <QuizInterface
+        questions={questions}
+        quizState={quizState}
+        onAnswerSelect={handleAnswerSelect}
+        onNextQuestion={handleNextQuestion}
+        onPrevQuestion={handlePrevQuestion}
+        onSubmit={handleSubmit}
+        onTimeUpdate={handleTimeUpdate}
+        submitting={submitting}
+        isMockTest={isMockTest}
+      />
     </UserProtectedRoute>
   );
 }

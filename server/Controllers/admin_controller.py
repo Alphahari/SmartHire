@@ -5,7 +5,7 @@ from functools import wraps
 from datetime import datetime, timedelta
 import pytz
 from sqlalchemy.orm import joinedload
-from sqlalchemy import func, or_
+from sqlalchemy import case, desc, func, or_
 # from extensions import cache
 
 # Helper functions
@@ -22,6 +22,12 @@ def convert_to_ist2(dt):
     if not dt:
         return None
         
+    # Handle datetime.date objects (returned by func.date)
+    # CHECK THIS FIRST before accessing tzinfo
+    if hasattr(dt, 'isoformat') and not hasattr(dt, 'tzinfo'):
+         # It's likely a date object, just return the string
+         return dt.isoformat()
+
     IST = pytz.timezone("Asia/Kolkata")
     
     # Handle string inputs
@@ -82,8 +88,8 @@ def register_admin_routes(api):
             user = User.query.get(id)
             if not user:
                 return {'message': 'User not found'}, 404
-            QuizAttempt.query.filter_by(user_id=id).delete()
-            Score.query.filter_by(user_id=id).delete()
+            # QuizAttempt.query.filter_by(user_id=id).delete()
+            # Score.query.filter_by(user_id=id).delete()
 
             db.session.delete(user)
             db.session.commit()
@@ -540,62 +546,6 @@ def register_admin_routes(api):
     api.add_resource(AdminSearch, '/admin/search')
     api.add_resource(AdminQuestionsInQuiz, '/admin/quiz/<int:quiz_id>')
 
-
-    class AdminSummaryStats(Resource):
-        # @admin_required
-        def get(self):
-            # Get query parameters
-            days = request.args.get('days', '30')
-            subject_id = request.args.get('subject', 'all')
-            user_type = request.args.get('userType', 'all')
-            
-            # Calculate date range
-            if days == 'all':
-                start_date = None
-            else:
-                start_date = datetime.utcnow() - timedelta(days=int(days))
-            
-            # Total users
-            total_users = User.query.count()
-            
-            # Active users (logged in within the time range)
-            active_users = User.query
-            if start_date:
-                active_users = active_users.filter(User.last_visited >= start_date)
-            active_users_count = active_users.count()
-            
-            # Quizzes taken
-            quizzes_taken = QuizAttempt.query
-            if start_date:
-                quizzes_taken = quizzes_taken.filter(QuizAttempt.end_time >= start_date)
-            quizzes_taken_count = quizzes_taken.count()
-            
-            # Average score
-            avg_score = 0
-            if quizzes_taken_count > 0:
-                # Calculate average score across all attempts
-                total_correct = 0
-                total_questions = 0
-                
-                for attempt in quizzes_taken:
-                    scores = Score.query.filter_by(attempt_id=attempt.id).all()
-                    correct_in_attempt = sum(
-                        1 for score in scores
-                        if score.selected_option == score.question.correct_option
-                    )
-                    total_correct += correct_in_attempt
-                    total_questions += len(scores)
-                
-                if total_questions > 0:
-                    avg_score = round((total_correct / total_questions) * 100, 1)
-            
-            return {
-                'totalUsers': total_users,
-                'activeUsers': active_users_count,
-                'quizzesTaken': quizzes_taken_count,
-                'avgScore': avg_score
-            }, 200
-
     class AdminUserGrowth(Resource):
         # @admin_required
         def get(self):
@@ -628,47 +578,36 @@ def register_admin_routes(api):
             }, 200
 
     class AdminSubjectPerformance(Resource):
-        # @admin_required
         def get(self):
-            # Get average score per subject
-            subjects = Subject.query.all()
-            subject_data = []
-            
-            for subject in subjects:
-                # Get all quizzes in this subject
-                quizzes = Quiz.query.join(Chapter).filter(Chapter.subject_id == subject.id).all()
-                quiz_ids = [quiz.id for quiz in quizzes]
-                
-                # Get all attempts for these quizzes
-                attempts = QuizAttempt.query.filter(QuizAttempt.quiz_id.in_(quiz_ids)).all()
-                
-                total_correct = 0
-                total_questions = 0
-                
-                for attempt in attempts:
-                    scores = Score.query.filter_by(attempt_id=attempt.id).all()
-                    correct_in_attempt = sum(
-                        1 for score in scores
-                        if score.selected_option == score.question.correct_option
+            # Efficient SQL query instead of Python loops
+            results = db.session.query(
+                Subject.name,
+                func.avg(
+                    case(
+                        (Score.selected_option == Question.correct_option, 100),
+                        else_=0
                     )
-                    total_correct += correct_in_attempt
-                    total_questions += len(scores)
-                
-                avg_score = 0
-                if total_questions > 0:
-                    avg_score = round((total_correct / total_questions) * 100, 1)
-                
-                subject_data.append({
-                    'subject': subject.name,
-                    'avg_score': avg_score
-                })
+                ).label('avg_score')
+            ).select_from(Subject)\
+            .join(Chapter, Chapter.subject_id == Subject.id)\
+            .join(Quiz, Quiz.chapter_id == Chapter.id)\
+            .join(QuizAttempt, QuizAttempt.quiz_id == Quiz.id)\
+            .join(Score, Score.attempt_id == QuizAttempt.id)\
+            .join(Question, Score.question_id == Question.id)\
+            .group_by(Subject.name)\
+            .all()
             
-            # Sort by average score descending
-            subject_data.sort(key=lambda x: x['avg_score'], reverse=True)
-            
+            # Sort and Format
+            # Convert Decimal/Float to standard float for JSON serialization
+            formatted_results = sorted(
+                [{'subject': r[0], 'avg_score': round(float(r[1] or 0), 1)} for r in results],
+                key=lambda x: x['avg_score'],
+                reverse=True
+            )
+
             return {
-                'labels': [s['subject'] for s in subject_data],
-                'values': [s['avg_score'] for s in subject_data]
+                'labels': [item['subject'] for item in formatted_results],
+                'values': [item['avg_score'] for item in formatted_results]
             }, 200
 
     class AdminQuizActivity(Resource):
@@ -703,10 +642,24 @@ def register_admin_routes(api):
             }, 200
 
     class AdminPerformanceDistribution(Resource):
-        # @admin_required
+            # @admin_required
         def get(self):
-            # Get all completed quiz attempts
-            attempts = QuizAttempt.query.filter(QuizAttempt.end_time.isnot(None)).all()
+            # OPTIMIZED: Use SQL Aggregation instead of Python loops
+            # This reduces 1000+ queries down to 1 single query.
+            
+            # Subquery: Calculate percentage for every attempt directly in the database
+            # Logic: (Count of Correct Answers / Total Questions) * 100
+            stmt = db.session.query(
+                Score.attempt_id,
+                (func.sum(case((Score.selected_option == Question.correct_option, 1), else_=0)) * 100.0 / func.count(Score.id)).label('percentage')
+            ).join(
+                Question, Score.question_id == Question.id
+            ).group_by(
+                Score.attempt_id
+            ).subquery()
+            
+            # Query the calculated percentages
+            results = db.session.query(stmt.c.percentage).all()
             
             # Initialize buckets
             buckets = {
@@ -716,38 +669,30 @@ def register_admin_routes(api):
                 'needs_improvement': 0  # <60%
             }
             
-            for attempt in attempts:
-                # Calculate score percentage
-                scores = Score.query.filter_by(attempt_id=attempt.id).all()
-                total_questions = len(scores)
-                
-                if total_questions == 0:
-                    continue
+            # Sort results into buckets (in Python, which is fast for simple iteration)
+            for row in results:
+                try:
+                    # Handle potential None or Decimal types
+                    pct = float(row.percentage or 0)
                     
-                correct_answers = sum(
-                    1 for score in scores
-                    if score.selected_option == score.question.correct_option
-                )
-                score_percentage = (correct_answers / total_questions) * 100
-                
-                # Categorize into buckets
-                if score_percentage >= 90:
-                    buckets['excellent'] += 1
-                elif score_percentage >= 75:
-                    buckets['good'] += 1
-                elif score_percentage >= 60:
-                    buckets['average'] += 1
-                else:
-                    buckets['needs_improvement'] += 1
+                    if pct >= 90:
+                        buckets['excellent'] += 1
+                    elif pct >= 75:
+                        buckets['good'] += 1
+                    elif pct >= 60:
+                        buckets['average'] += 1
+                    else:
+                        buckets['needs_improvement'] += 1
+                except (ValueError, TypeError):
+                    continue
             
-            return [
-                buckets['excellent'],
-                buckets['good'],
-                buckets['average'],
-                buckets['needs_improvement']
-            ], 200
-        
-    api.add_resource(AdminSummaryStats, '/admin/stats/summary')
+            # Return exact object structure expected by AdminAnalytics.tsx
+            return {
+                'excellent': buckets['excellent'],
+                'good': buckets['good'],
+                'average': buckets['average'],
+                'needs_improvement': buckets['needs_improvement']
+            }, 200
     api.add_resource(AdminUserGrowth, '/admin/stats/user-growth')
     api.add_resource(AdminSubjectPerformance, '/admin/stats/subject-performance')
     api.add_resource(AdminQuizActivity, '/admin/stats/quiz-activity')
@@ -1224,3 +1169,161 @@ def register_admin_routes(api):
     # Add to register_admin_routes function:
     api.add_resource(AdminMockTests, '/admin/mock-tests')
     api.add_resource(AdminMockTest, '/admin/mock-tests/<int:id>')
+
+    class AdminSummaryStats(Resource):
+        def get(self):
+            # 1. Calculate Summary Counts
+            total_subjects = Subject.query.count()
+            
+            # Active users (users with a login/activity in last 7 days)
+            seven_days_ago = datetime.utcnow() - timedelta(days=7)
+            active_users = User.query.filter(User.last_visited >= seven_days_ago).count()
+            
+            # Total Quizzes Completed (Attempts with status 'completed' or having an end_time)
+            quizzes_completed = QuizAttempt.query.filter(QuizAttempt.end_time.isnot(None)).count()
+            
+            # Average Score Calculation
+            avg_score = 0
+            
+            # FIX: Added .select_from(Score) to define the query root
+            # Removed redundant join to QuizAttempt which was causing the 500 Error
+            attempts_with_scores = db.session.query(
+                func.avg(
+                    case(
+                        (Score.selected_option == Question.correct_option, 100),
+                        else_=0
+                    )
+                )
+            ).select_from(Score)\
+             .join(Question, Score.question_id == Question.id)\
+             .scalar()
+            
+            if attempts_with_scores is not None:
+                avg_score = round(float(attempts_with_scores), 1)
+
+            # 2. Get Recent Activity
+            recent_activity = []
+
+            # Get 3 most recent new users
+            new_users = User.query.order_by(desc(User.created_at)).limit(3).all()
+            for u in new_users:
+                recent_activity.append({
+                    'type': 'user_register',
+                    'title': 'New user registered',
+                    'description': f'{u.full_name} joined the platform',
+                    'time': u.created_at.isoformat() if u.created_at else datetime.utcnow().isoformat(),
+                    'timestamp': u.created_at.timestamp() if u.created_at else datetime.utcnow().timestamp()
+                })
+
+            # Get 3 most recent quiz completions
+            recent_attempts = QuizAttempt.query.filter(QuizAttempt.end_time.isnot(None))\
+                .options(joinedload(QuizAttempt.user), joinedload(QuizAttempt.quiz))\
+                .order_by(desc(QuizAttempt.end_time)).limit(3).all()
+                
+            for qa in recent_attempts:
+                # Calculate score for this attempt
+                score_count = Score.query.filter_by(attempt_id=qa.id, user_id=qa.user_id).count()
+                correct_count = Score.query.join(Question).filter(
+                    Score.attempt_id == qa.id,
+                    Score.selected_option == Question.correct_option
+                ).count()
+                
+                pct = 0
+                if score_count > 0:
+                    pct = round((correct_count / score_count) * 100)
+
+                recent_activity.append({
+                    'type': 'quiz_complete',
+                    'title': 'Quiz completed',
+                    'description': f'{qa.quiz.remarks if qa.quiz else "Quiz"} - Score: {pct}%',
+                    'time': qa.end_time.isoformat(),
+                    'timestamp': qa.end_time.timestamp()
+                })
+
+            # Sort combined activity by timestamp desc and take top 5
+            recent_activity.sort(key=lambda x: x['timestamp'], reverse=True)
+            recent_activity = recent_activity[:5]
+
+            return {
+                'stats': {
+                    'total_subjects': total_subjects,
+                    'active_users': active_users,
+                    'quizzes_completed': quizzes_completed,
+                    'avg_score': avg_score
+                },
+                'recent_activity': recent_activity
+            }, 200
+    api.add_resource(AdminSummaryStats, '/admin/stats/summary')
+
+    class AdminTotalUsers(Resource):
+        def get(self):
+            days = request.args.get('days', '30')
+            
+            if days == 'all':
+                total_users = User.query.count()
+            else:
+                start_date = datetime.utcnow() - timedelta(days=int(days))
+                total_users = User.query.filter(User.created_at >= start_date).count()
+            
+            return {'totalUsers': total_users}, 200
+
+    class AdminActiveUsers(Resource):
+        def get(self):
+            days = request.args.get('days', '7')
+            start_date = datetime.utcnow() - timedelta(days=int(days))
+            
+            active_users = User.query.filter(User.last_visited >= start_date).count()
+            
+            return {'activeUsers': active_users}, 200
+
+    class AdminQuizzesTaken(Resource):
+        def get(self):
+            days = request.args.get('days', '30')
+            
+            if days == 'all':
+                quizzes_taken = QuizAttempt.query.filter(QuizAttempt.end_time.isnot(None)).count()
+            else:
+                start_date = datetime.utcnow() - timedelta(days=int(days))
+                quizzes_taken = QuizAttempt.query.filter(
+                    QuizAttempt.end_time >= start_date,
+                    QuizAttempt.end_time.isnot(None)
+                ).count()
+            
+            return {'quizzesTaken': quizzes_taken}, 200
+
+    class AdminAvgScore(Resource):
+        def get(self):
+            days = request.args.get('days', '30')
+            
+            if days == 'all':
+                query = db.session.query(
+                    func.avg(
+                        case(
+                            (Score.selected_option == Question.correct_option, 100),
+                            else_=0
+                        )
+                    )
+                ).select_from(Score).join(Question, Score.question_id == Question.id)
+            else:
+                start_date = datetime.utcnow() - timedelta(days=int(days))
+                query = db.session.query(
+                    func.avg(
+                        case(
+                            (Score.selected_option == Question.correct_option, 100),
+                            else_=0
+                        )
+                    )
+                ).select_from(Score).join(Question, Score.question_id == Question.id)\
+                .join(QuizAttempt, Score.attempt_id == QuizAttempt.id)\
+                .filter(QuizAttempt.end_time >= start_date)
+            
+            avg_score = query.scalar()
+            
+            return {'avgScore': round(float(avg_score or 0), 1)}, 200
+
+    # Add these routes to the api.add_resource calls:
+    api.add_resource(AdminTotalUsers, '/admin/stats/total-users')
+    api.add_resource(AdminActiveUsers, '/admin/stats/active-users')
+    api.add_resource(AdminQuizzesTaken, '/admin/stats/quizzes-taken')
+    api.add_resource(AdminAvgScore, '/admin/stats/avg-score')
+    

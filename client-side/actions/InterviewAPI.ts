@@ -1,11 +1,9 @@
 // actions/InterviewAPI.ts
 'use server';
 
-const API_BASE_URL = 'http://localhost:5054/api/interview';
-
 export async function startInterviewSession() {
   try {
-    const response = await fetch(`${API_BASE_URL}/start-session`, {
+    const response = await fetch(`${process.env.INTERVIEW_API}/start-session`, {
       method: 'POST',
       cache: 'no-store',
     });
@@ -20,7 +18,7 @@ export async function startInterviewSession() {
 
 export async function submitAnswer(formData: FormData) {
   try {
-    const response = await fetch(`${API_BASE_URL}/submit-answer`, {
+    const response = await fetch(`${process.env.INTERVIEW_API}/submit-answer`, {
       method: 'POST',
       body: formData,
     });
@@ -35,7 +33,7 @@ export async function submitAnswer(formData: FormData) {
 
 export async function getFinalScore(sessionId: string) {
   try {
-    const response = await fetch(`${API_BASE_URL}/final-score`, {
+    const response = await fetch(`${process.env.INTERVIEW_API}/final-score`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sessionId }),
@@ -51,7 +49,8 @@ export async function getFinalScore(sessionId: string) {
 
 export async function uploadPdf(formData: FormData) {
   try {
-    const response = await fetch('http://localhost:5054/api/interview/upload-pdf', {
+    const response = await fetch(`${process.env.INTERVIEW_API}/upload-pdf`
+      , {
       method: 'POST',
       body: formData,
     });

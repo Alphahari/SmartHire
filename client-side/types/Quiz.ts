@@ -6,4 +6,5 @@ export interface Quiz {
   end_time: string;
   duration: number;
   remarks?: string;
+  isMockTest?: boolean;
 }
