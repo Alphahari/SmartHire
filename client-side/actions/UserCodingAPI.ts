@@ -17,6 +17,7 @@ export const fetchUserCodingTopics = async (): Promise<CodingTopic[]> => {
   return response.json();
 };
 
+// actions/UserCodingAPI.ts
 export const fetchUserCodingQuestions = async (topicId: number): Promise<CodingQuestion[]> => {
   const response = await fetch(`${API_BASE_URL}/coding/questions?topic_id=${topicId}`, {
     credentials: 'include',
@@ -28,7 +29,19 @@ export const fetchUserCodingQuestions = async (topicId: number): Promise<CodingQ
   }
   
   const data = await response.json();
-  return data.questions || [];
+  
+  // Log the response to debug
+  console.log('Coding questions response:', data);
+  
+  // Check if data has a 'questions' property
+  if (data.questions && Array.isArray(data.questions)) {
+    return data.questions;
+  } else if (Array.isArray(data)) {
+    return data;
+  } else {
+    console.error('Unexpected response structure:', data);
+    return [];
+  }
 };
 
 export const fetchUserCodingQuestion = async (questionId: number): Promise<CodingQuestion> => {

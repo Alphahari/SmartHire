@@ -8,6 +8,12 @@
       "problemMatcher": []
     },
     {
+      "label": "ai-interview-backend",
+      "type": "shell",
+      "command": "cd AI-Interview-Backend && source venv/bin/activate && python3 app.py",
+      "problemMatcher": []
+    },
+    {
       "label": "go-server",
       "type": "shell",
       "command": "cd ProctorX-executor && go run .",
@@ -35,6 +41,7 @@
       "label": "start-services",
       "dependsOn": [
         "backend-flask",
+        "ai-interview-backend",
         "go-server",
         "frontend-next",
         "celery-worker"
