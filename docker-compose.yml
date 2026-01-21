@@ -1,0 +1,108 @@
+services:
+  backend:
+    image: alpha1717/smarthire-server:v1
+    build:
+      context: ./server
+    container_name: smarthire-backend
+    command: >
+      gunicorn app:app
+      --bind 0.0.0.0:5000
+      --workers=4
+      --threads=2
+      --timeout=60
+      --graceful-timeout=30
+      --access-logfile=- 
+      --error-logfile=-
+    ports:
+      - "5000:5000"
+    env_file: ./server/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - smarthire-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      # test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  worker:
+    image: alpha1717/smarthire-server:v1
+    container_name: smarthire-worker
+    command: >
+      celery -A celery_worker.celery worker 
+      --loglevel=info 
+      --concurrency=4 
+      --prefetch-multiplier=1
+    env_file: ./server/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - smarthire-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 2G
+
+  # beat:
+  #   image: alpha1717/smarthire-server:v1
+  #   container_name: smarthire-beat
+  #   command: >
+  #     celery -A celery_worker.celery beat 
+  #     --loglevel=info
+  #   env_file: ./server/.env
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - smarthire-net
+  #   restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: smarthire-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - smarthire-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+  frontend:
+    image: alpha1717/client-side:latest
+    container_name: smarthire-frontend
+    env_file: ./client-side/.env
+    ports:
+      - "3000:3000"
+    networks:
+      - smarthire-net
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+
+networks:
+  smarthire-net:
+    driver: bridge

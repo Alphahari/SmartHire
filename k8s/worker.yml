@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  namespace: smarthire
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: celery-worker
+  template:
+    metadata:
+      labels:
+        app: celery-worker
+    spec:
+      containers:
+        - name: worker
+          image: alpha1717/smarthire-server:v1
+          command: ["celery"]
+          args:
+            ["-A", "celery_worker.celery", "worker", "--loglevel=info", "--concurrency=4"]
+          envFrom:
+            - secretRef:
+                name: server-secrets
+          resources:
+            limits:
+              cpu: "1.5"
+              memory: "2Gi"

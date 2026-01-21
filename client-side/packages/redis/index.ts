@@ -2,7 +2,7 @@ import { createClient } from "redis";
 
 // IMPORTANT: specify the correct port
 export const client = createClient({
-    url: "redis://localhost:6380"
+    url: "redis://localhost:6379"
 });
 
 export const pubSubClient = createClient({

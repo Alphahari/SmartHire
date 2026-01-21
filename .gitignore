@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+.idea
 
 # debug
 npm-debug.log*
@@ -71,3 +72,4 @@ instance
 *.env
 waste.txt
 celerybeat-schedule
+k8s/secret.yml

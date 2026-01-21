@@ -38,7 +38,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'pool_pre_ping': True,
 }
 
-REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6380')
+REDIS_URL = os.getenv('REDIS_URL', 'redis://redis:6379')
 
 app.config.update(
     broker_url=REDIS_URL,
@@ -264,6 +264,10 @@ celery.conf.beat_schedule = {
         'schedule': crontab(day_of_month=1, hour=14, minute=30)
     }
 }
+
+@app.route('/health')
+def health_check():
+    return jsonify({"status": "healthy"}), 200
 
 @app.errorhandler(429)
 def ratelimit_handler(e):
