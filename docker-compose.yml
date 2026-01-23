@@ -1,6 +1,6 @@
 services:
   backend:
-    image: alpha1717/smarthire-server:v1
+    image: alpha1717/smarthire-server:v2
     build:
       context: ./server
     container_name: smarthire-backend
@@ -35,7 +35,7 @@ services:
           memory: 1G
 
   worker:
-    image: alpha1717/smarthire-server:v1
+    image: alpha1717/smarthire-server:v2
     container_name: smarthire-worker
     command: >
       celery -A celery_worker.celery worker 
@@ -91,7 +91,7 @@ services:
           memory: 512M
 
   frontend:
-    image: alpha1717/client-side:latest
+    image: alpha1717/smarthire-frontend:v3
     container_name: smarthire-frontend
     env_file: ./client-side/.env
     ports:

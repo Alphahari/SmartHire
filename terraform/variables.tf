@@ -1,36 +1,45 @@
 variable "project_id" {
-  description = "GCP project ID"
+  description = "GCP Project ID"
+  type        = string
+}
+
+variable "env" {
+  description = "Environment name (dev, prod)"
   type        = string
 }
 
 variable "region" {
-  description = "GCP region"
-  type        = string
-  default     = "us-central1"
+  type = string
 }
 
 variable "zone" {
-  description = "GCP zone"
-  type        = string
-  default     = "us-central1-c"
+  type = string
 }
 
-variable "environment" {
-  description = "Deployment environment"
-  type        = string
-
-  validation {
-    condition     = contains(["dev", "staging", "prod"], var.environment)
-    error_message = "Environment must be one of: dev, staging, prod."
-  }
+variable "instance_name" {
+  type = string
 }
 
 variable "machine_type" {
-  description = "GCE machine type"
+  type = string
+}
+
+variable "image" {
+  description = "GCE boot image"
   type        = string
 }
 
-variable "name" {
-  description = "Base name for the instance"
+variable "subnet_cidr" {
+  description = "CIDR range for subnet"
+  type        = string
+}
+
+variable "boot_disk_size_gb" {
+  description = "Boot disk size in GB"
+  type        = number
+}
+
+variable "service_account_email" {
+  description = "Service account email attached to the compute instance"
   type        = string
 }

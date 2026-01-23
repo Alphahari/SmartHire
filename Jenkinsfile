@@ -1,127 +1,124 @@
 @Library('Shared') _
 pipeline {
-    agent {label 'Node'}
-    
-    environment{
+    agent { label 'Node' }
+
+    environment {
         SONAR_HOME = tool "Sonar"
+        REGISTRY = "alpha1717"
+        BACKEND_IMAGE = "smarthire-server"
+        FRONTEND_IMAGE = "smarthire-frontend"
     }
-     
+
     parameters {
-        string(name: 'FRONTEND_DOCKER_TAG', defaultValue: '', description: 'Setting docker image for latest push')
-        string(name: 'BACKEND_DOCKER_TAG', defaultValue: '', description: 'Setting docker image for latest push')
+        string(
+            name: 'BACKEND_IMAGE_TAG',
+            defaultValue: '',
+            description: 'Docker image tag for backend (e.g. v1.2.0, build-45)'
+        )
+        string(
+            name: 'FRONTEND_IMAGE_TAG',
+            defaultValue: '',
+            description: 'Docker image tag for frontend (e.g. v1.2.0, build-45)'
+        )
     }
-    
+
     stages {
+
         stage("Validate Parameters") {
             steps {
                 script {
-                    if (params.FRONTEND_DOCKER_TAG == '' || params.BACKEND_DOCKER_TAG == '') {
-                        error("FRONTEND_DOCKER_TAG and BACKEND_DOCKER_TAG must be provided.")
+                    if (!params.BACKEND_IMAGE_TAG?.trim() || !params.FRONTEND_IMAGE_TAG?.trim()) {
+                        error("Both BACKEND_IMAGE_TAG and FRONTEND_IMAGE_TAG must be provided")
                     }
                 }
             }
         }
-        stage("Workspace cleanup"){
-            steps{
-                script{
+
+        stage("Workspace cleanup") {
+            steps {
+                script {
                     cleanWs()
                 }
             }
         }
-        
-        stage('Git: Code Checkout') {
+
+        stage("Git: Code Checkout") {
             steps {
-                script{
-                    code_checkout("https://github.com/Alphahari/SmartHire.git","main")
+                script {
+                    code_checkout(
+                        "https://github.com/Alphahari/SmartHire.git",
+                        "main"
+                    )
                 }
             }
         }
-        
-        stage("Trivy: Filesystem scan"){
-            steps{
-                script{
+
+        stage("Trivy: Filesystem scan") {
+            steps {
+                script {
                     trivy_scan()
                 }
             }
         }
 
-        stage("OWASP: Dependency check"){
-            steps{
-                script{
-                    owasp_dependency()
+        stage("SonarQube: Code Analysis") {
+            steps {
+                script {
+                    sonarqube_analysis(
+                        "Sonar",
+                        "smarthire",
+                        "smarthire"
+                    )
                 }
             }
         }
-        
-        stage("SonarQube: Code Analysis"){
-            steps{
-                script{
-                    sonarqube_analysis("Sonar","wanderlust","wanderlust")
-                }
-            }
-        }
-        
-        stage("SonarQube: Code Quality Gates"){
-            steps{
-                script{
+
+        stage("SonarQube: Quality Gate") {
+            steps {
+                script {
                     sonarqube_code_quality()
                 }
             }
         }
-        
-        stage('Exporting environment variables') {
-            parallel{
-                stage("Backend env setup"){
-                    steps {
-                        script{
-                            dir("Automations"){
-                                sh "bash updatebackendnew.sh"
-                            }
-                        }
+
+        stage("Docker: Build Images") {
+            steps {
+                script {
+                    dir("server") {
+                        docker_build(
+                            BACKEND_IMAGE,
+                            params.BACKEND_IMAGE_TAG,
+                            REGISTRY
+                        )
                     }
-                }
-                
-                stage("Frontend env setup"){
-                    steps {
-                        script{
-                            dir("Automations"){
-                                sh "bash updatefrontendnew.sh"
-                            }
-                        }
+
+                    dir("client") {
+                        docker_build(
+                            FRONTEND_IMAGE,
+                            params.FRONTEND_IMAGE_TAG,
+                            REGISTRY
+                        )
                     }
                 }
             }
         }
-        
-        stage("Docker: Build Images"){
-            steps{
-                script{
-                        dir('backend'){
-                            docker_build("wanderlust-backend-beta","${params.BACKEND_DOCKER_TAG}","trainwithshubham")
-                        }
-                    
-                        dir('frontend'){
-                            docker_build("wanderlust-frontend-beta","${params.FRONTEND_DOCKER_TAG}","trainwithshubham")
-                        }
-                }
-            }
-        }
-        
-        stage("Docker: Push to DockerHub"){
-            steps{
-                script{
-                    docker_push("wanderlust-backend-beta","${params.BACKEND_DOCKER_TAG}","trainwithshubham") 
-                    docker_push("wanderlust-frontend-beta","${params.FRONTEND_DOCKER_TAG}","trainwithshubham")
+
+        stage("Docker: Push Images") {
+            steps {
+                script {
+                    docker_push(BACKEND_IMAGE, params.BACKEND_IMAGE_TAG, REGISTRY)
+                    docker_push(FRONTEND_IMAGE, params.FRONTEND_IMAGE_TAG, REGISTRY)
                 }
             }
         }
     }
+
     post{
         success{
             archiveArtifacts artifacts: '*.xml', followSymlinks: false
-            build job: "Wanderlust-CD", parameters: [
-                string(name: 'FRONTEND_DOCKER_TAG', value: "${params.FRONTEND_DOCKER_TAG}"),
-                string(name: 'BACKEND_DOCKER_TAG', value: "${params.BACKEND_DOCKER_TAG}")
+            build job: "smarthire-CD", parameters: [
+                string(name: 'FRONTEND_IMAGE_TAG', value: "${params.FRONTEND_IMAGE_TAG}"),
+                string(name: 'BACKEND_IMAGE_TAG', value: "${params.BACKEND_IMAGE_TAG}")
             ]
         }
     }

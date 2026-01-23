@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: frontend
+  name: frontend-Deployment
   namespace: smarthire
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: frontend
@@ -15,10 +15,12 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: alpha1717/client-side:latest
+          image: alpha1717/smarthire:frontend:v1
           ports:
             - containerPort: 3000
           envFrom:
+            - configMapRef:
+                name: ConfigMap.yml
             - secretRef:
                 name: server-secrets
 
@@ -26,11 +28,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: frontend
+  name: frontend-service
   namespace: smarthire
 spec:
+  type: NodePort
   selector:
     app: frontend
   ports:
     - port: 3000
-  type: ClusterIP
+      targetPort: 3000
+      protocol: TCP
+      NodePort: 31000

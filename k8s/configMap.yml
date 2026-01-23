@@ -4,3 +4,7 @@ metadata:
   name: smarthire-config
   namespace: smarthire
 data:
+  NEXT_PUBLIC_BASE_URL : http://localhost:5000
+  BASE_API_URL : http://localhost:3000/api
+  INTERVIEW_API : http://localhost:5054/api/interview
+  NEXTAUTH_URL : http://localhost:3000

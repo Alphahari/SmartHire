@@ -1,0 +1,99 @@
+@Library('Shared') _
+pipeline {
+    agent any
+
+    parameters {
+        string(
+            name: 'BACKEND_IMAGE_TAG',
+            defaultValue: '',
+            description: 'Backend Docker image tag to deploy'
+        )
+        string(
+            name: 'FRONTEND_IMAGE_TAG',
+            defaultValue: '',
+            description: 'Frontend Docker image tag to deploy'
+        )
+    }
+
+    stages {
+
+        stage("Validate Parameters") {
+            steps {
+                script {
+                    if (!params.BACKEND_IMAGE_TAG?.trim() || !params.FRONTEND_IMAGE_TAG?.trim()) {
+                        error("Both BACKEND_IMAGE_TAG and FRONTEND_IMAGE_TAG must be provided")
+                    }
+                }
+            }
+        }
+
+        stage("Workspace cleanup") {
+            steps {
+                script {
+                    cleanWs()
+                }
+            }
+        }
+
+        stage("Git: Code Checkout") {
+            steps {
+                script {
+                    code_checkout(
+                        "https://github.com/Alphahari/SmartHire.git",
+                        "main"
+                    )
+                }
+            }
+        }
+
+        stage("GitOps: Update Kubernetes Manifests") {
+            steps {
+                script {
+                    dir('k8s') {
+                        sh """
+                            sed -i 's|image: alpha1717/smarthire-server:.*|image: alpha1717/smarthire-server:${params.BACKEND_IMAGE_TAG}|g' kubernetes/backend.yml
+                            sed -i 's|image: alpha1717/smarthire-server:.*|image: alpha1717/smarthire-server:${params.BACKEND_IMAGE_TAG}|g' kubernetes/worker.yml
+                            sed -i 's|image: alpha1717/client-side:.*|image: alpha1717/client-side:${params.FRONTEND_IMAGE_TAG}|g' kubernetes/frontend.yml
+                        """
+                    }
+                }
+            }
+        }
+
+        stage("Git: Commit & Push Changes") {
+            steps {
+                script {
+                    withCredentials([
+                        gitUsernamePassword(
+                            credentialsId: 'Github-cred',
+                            gitToolName: 'Default'
+                        )
+                    ]) {
+                        sh """
+                        echo "Checking repository status: "
+                        git status
+                    
+                        echo "Adding changes to git: "
+                        git add .
+                        
+                        echo "Commiting changes: "
+                        git commit -m "Updated environment variables"
+                        
+                        echo "Pushing changes to github: "
+                        git push https://github.com/Alphahari/SmartHire.git main
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "CD successful. ArgoCD will sync the new versions."
+        }
+        failure {
+            echo "CD failed. Deployment not triggered."
+        }
+    }
+}
