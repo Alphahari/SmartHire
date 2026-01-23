@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: alpha1717/smarthire-server:v2
+          image: alpha1717/smarthire-server:v5
           ports:
             - containerPort: 5000
           envFrom:
