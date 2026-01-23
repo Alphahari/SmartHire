@@ -31,11 +31,9 @@ metadata:
   name: frontend-service
   namespace: smarthire
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: frontend
   ports:
     - port: 3000
       targetPort: 3000
-      protocol: TCP
-      NodePort: 31000
