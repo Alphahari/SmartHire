@@ -73,3 +73,4 @@ instance
 waste.txt
 celerybeat-schedule
 k8s/secret.yml
+k8s/cluster-secret-store.yml
