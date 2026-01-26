@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: frontend-Deployment
+  name: frontend-deployment
   namespace: smarthire
 spec:
   replicas: 1
@@ -20,7 +20,7 @@ spec:
             - containerPort: 3000
           envFrom:
             - configMapRef:
-                name: ConfigMap.yml
+                name: smarthire-config
             - secretRef:
                 name: server-secrets
 
